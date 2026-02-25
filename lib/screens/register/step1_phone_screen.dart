@@ -4,6 +4,7 @@ import '../../utils/app_theme.dart';
 import '../../utils/widgets.dart';
 import 'step2_otp_screen.dart';
 
+
 class Step1PhoneScreen extends StatefulWidget {
   const Step1PhoneScreen({super.key});
 
@@ -161,8 +162,7 @@ class _Step1PhoneScreenState extends State<Step1PhoneScreen> {
                     ),
                   ),
 
-                  const Spacer(),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 100),
                   PrimaryButton(
                     label: 'Recevoir le code',
                     onPressed: _requestOtp,
@@ -184,3 +184,4 @@ class _Step1PhoneScreenState extends State<Step1PhoneScreen> {
     super.dispose();
   }
 }
+

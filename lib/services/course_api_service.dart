@@ -148,4 +148,14 @@ class CourseApiService {
     if (response.statusCode == 200) return CourseModel.fromJson(jsonDecode(response.body));
     return null;
   }
+
+  // ─── Conducteur : stats du jour ───────────────────────────────────────
+  static Future<Map<String, dynamic>> getStatsConducteur() async {
+    final uri = Uri.parse('${ApiService.baseUrl}/courses/conducteur/historique');
+    final response = await http.get(uri, headers: await _authHeaders());
+    if (response.statusCode == 200) {
+      return Map<String, dynamic>.from(jsonDecode(response.body));
+    }
+    return {'gains_du_jour': 0, 'total_courses': 0, 'historique': []};
+  }
 }

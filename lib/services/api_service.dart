@@ -13,12 +13,19 @@ class ApiService {
   // ─── OTP ──────────────────────────────────────────────────────────────────
 
   static Future<Map<String, dynamic>> demanderOtp(String telephone) async {
-    final uri = Uri.parse('$baseUrl/auth/demander-otp?telephone=$telephone');
-    final response = await http.post(uri);
+    final uri = Uri.parse('$baseUrl/auth/demander-otp');
+
+    // On utilise le paramètre body de http.post avec un Map<String, String>
+    // Sans jsonEncode, le package 'http' l'envoie par défaut en form-urlencoded
+    final response = await http.post(
+      uri,
+      body: {'telephone': telephone},
+    );
+
     if (response.statusCode == 200) {
       return jsonDecode(response.body);
     }
-    throw Exception('Erreur lors de l\'envoi du code OTP');
+    throw Exception('Erreur ${response.statusCode}: ${response.body}');
   }
 
   static Future<Map<String, dynamic>> verifierOtp(
