@@ -1,44 +1,101 @@
 import 'package:flutter/material.dart';
 import 'app_theme.dart';
 
-// ─── Bouton principal jaune ────────────────────────────────────────────────
-class PrimaryButton extends StatelessWidget {
+/// Affiche un SnackBar stylisé
+void showSnack(BuildContext context, String message, {bool error = false}) {
+  ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(
+      content: Text(message),
+      backgroundColor: error ? AppColors.error : AppColors.success,
+      behavior: SnackBarBehavior.floating,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      margin: const EdgeInsets.all(16),
+      duration: const Duration(seconds: 3),
+    ),
+  );
+}
+
+/// Bouton principal de l'appli (nom original)
+class AppButton extends StatelessWidget {
   final String label;
   final VoidCallback? onPressed;
-  final bool isLoading;
+  final bool loading;
+  final IconData? icon;
+  final Color? color;
 
-  const PrimaryButton({
+  const AppButton({
     super.key,
     required this.label,
     this.onPressed,
-    this.isLoading = false,
+    this.loading = false,
+    this.icon,
+    this.color,
   });
 
   @override
   Widget build(BuildContext context) {
     return SizedBox(
       width: double.infinity,
-      height: 54,
+      height: 52,
       child: ElevatedButton(
-        onPressed: isLoading ? null : onPressed,
-        child: isLoading
+        onPressed: loading ? null : onPressed,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: color ?? AppColors.primary,
+        ),
+        child: loading
             ? const SizedBox(
                 width: 22,
                 height: 22,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2.5,
-                  color: Colors.black54,
-                ),
+                child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.white),
               )
-            : Text(label),
+            : Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  if (icon != null) ...[
+                    Icon(icon, size: 20),
+                    const SizedBox(width: 8),
+                  ],
+                  Text(label),
+                ],
+              ),
       ),
     );
   }
 }
 
-// ─── Logo de l'app ────────────────────────────────────────────────────────
+/// Alias PrimaryButton → AppButton (utilisé dans login, register, notation)
+class PrimaryButton extends StatelessWidget {
+  final String label;
+  final VoidCallback? onPressed;
+  final bool isLoading;
+  final IconData? icon;
+  final Color? color;
+
+  const PrimaryButton({
+    super.key,
+    required this.label,
+    this.onPressed,
+    this.isLoading = false,
+    this.icon,
+    this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return AppButton(
+      label: label,
+      onPressed: onPressed,
+      loading: isLoading,
+      icon: icon,
+      color: color,
+    );
+  }
+}
+
+/// Logo de l'application
 class AppLogo extends StatelessWidget {
   final double size;
+
   const AppLogo({super.key, this.size = 80});
 
   @override
@@ -48,25 +105,25 @@ class AppLogo extends StatelessWidget {
       height: size,
       decoration: BoxDecoration(
         color: AppColors.primary,
-        borderRadius: BorderRadius.circular(size * 0.25),
+        shape: BoxShape.circle,
         boxShadow: [
           BoxShadow(
-            color: AppColors.primary.withOpacity(0.35),
+            color: AppColors.primary.withValues(alpha: 0.3),
             blurRadius: 20,
             offset: const Offset(0, 8),
           ),
         ],
       ),
       child: Icon(
-        Icons.motorcycle_rounded,
-        size: size * 0.55,
-        color: Colors.black87,
+        Icons.directions_car,
+        color: Colors.white,
+        size: size * 0.5,
       ),
     );
   }
 }
 
-// ─── Indicateur d'étapes ─────────────────────────────────────────────────
+/// Indicateur d'étapes pour le processus d'inscription
 class StepIndicator extends StatelessWidget {
   final int currentStep;
   final int totalSteps;
@@ -81,118 +138,26 @@ class StepIndicator extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
-      children: List.generate(totalSteps, (i) {
-        final active = i <= currentStep;
-        return AnimatedContainer(
-          duration: const Duration(milliseconds: 300),
-          margin: const EdgeInsets.symmetric(horizontal: 4),
-          width: active ? 24 : 8,
-          height: 8,
-          decoration: BoxDecoration(
-            color: active ? AppColors.primary : AppColors.border,
-            borderRadius: BorderRadius.circular(4),
-          ),
+      children: List.generate(totalSteps, (index) {
+        final isActive = index < currentStep;
+        final isCurrent = index == currentStep - 1;
+        return Row(
+          children: [
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 300),
+              width: isCurrent ? 32 : 10,
+              height: 10,
+              decoration: BoxDecoration(
+                color: isActive || isCurrent
+                    ? AppColors.primary
+                    : AppColors.primary.withValues(alpha: 0.2),
+                borderRadius: BorderRadius.circular(5),
+              ),
+            ),
+            if (index < totalSteps - 1) const SizedBox(width: 6),
+          ],
         );
       }),
     );
   }
-}
-
-// ─── Sélecteur de photo ───────────────────────────────────────────────────
-class PhotoPickerCard extends StatelessWidget {
-  final String label;
-  final String? imagePath;
-  final VoidCallback onTap;
-  final bool required;
-  final IconData icon;
-
-  const PhotoPickerCard({
-    super.key,
-    required this.label,
-    required this.onTap,
-    this.imagePath,
-    this.required = false,
-    this.icon = Icons.camera_alt_rounded,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        height: 110,
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(
-            color: imagePath != null ? AppColors.primary : AppColors.border,
-            width: imagePath != null ? 2 : 1,
-          ),
-        ),
-        child: imagePath != null
-            ? ClipRRect(
-                borderRadius: BorderRadius.circular(13),
-                child: Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    Image.network(
-                      imagePath!,
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => _placeholder(),
-                    ),
-                    Positioned(
-                      bottom: 6,
-                      right: 6,
-                      child: Container(
-                        padding: const EdgeInsets.all(4),
-                        decoration: const BoxDecoration(
-                          color: AppColors.primary,
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(Icons.check, size: 14, color: Colors.black87),
-                      ),
-                    ),
-                  ],
-                ),
-              )
-            : _placeholder(),
-      ),
-    );
-  }
-
-  Widget _placeholder() {
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        Icon(icon, size: 32, color: AppColors.textLight),
-        const SizedBox(height: 6),
-        Text(
-          label,
-          textAlign: TextAlign.center,
-          style: const TextStyle(
-            fontSize: 12,
-            color: AppColors.textMedium,
-            fontWeight: FontWeight.w500,
-          ),
-        ),
-        if (required)
-          const Text(
-            '* Obligatoire',
-            style: TextStyle(fontSize: 10, color: AppColors.error),
-          ),
-      ],
-    );
-  }
-}
-
-// ─── Snackbar helper ─────────────────────────────────────────────────────
-void showSnack(BuildContext context, String msg, {bool error = false}) {
-  ScaffoldMessenger.of(context).showSnackBar(
-    SnackBar(
-      content: Text(msg),
-      backgroundColor: error ? AppColors.error : AppColors.success,
-      behavior: SnackBarBehavior.floating,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-    ),
-  );
 }

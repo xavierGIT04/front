@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import '../services/auth_storage.dart';
 import '../utils/app_theme.dart';
 import 'login_screen.dart';
-import 'passager_home_screen.dart';
+import 'passager/passager_home_screen.dart';
 import 'conducteur_home_screen.dart';
 
 class SplashScreen extends StatefulWidget {
@@ -20,8 +20,8 @@ class _SplashScreenState extends State<SplashScreen>
   @override
   void initState() {
     super.initState();
-    _controller =
-        AnimationController(vsync: this, duration: const Duration(milliseconds: 800));
+    _controller = AnimationController(
+        vsync: this, duration: const Duration(milliseconds: 800));
     _scaleAnim =
         CurvedAnimation(parent: _controller, curve: Curves.elasticOut);
     _controller.forward();
@@ -30,8 +30,10 @@ class _SplashScreenState extends State<SplashScreen>
 
   Future<void> _checkAuth() async {
     await Future.delayed(const Duration(seconds: 2));
+
     final isLogged = await AuthStorage.isLoggedIn();
     if (!mounted) return;
+
     if (!isLogged) {
       Navigator.pushReplacement(
         context,
@@ -39,8 +41,19 @@ class _SplashScreenState extends State<SplashScreen>
       );
       return;
     }
+
     final roles = await AuthStorage.getRoles();
     if (!mounted) return;
+
+    if (roles.isEmpty) {
+      await AuthStorage.clearSession();
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => const LoginScreen()),
+      );
+      return;
+    }
+
     if (roles.contains('ROLE_CONDUCTEUR')) {
       Navigator.pushReplacement(
         context,
@@ -89,9 +102,15 @@ class _SplashScreenState extends State<SplashScreen>
               ),
               const Text(
                 'Votre transport au Togo',
-                style: TextStyle(
-                  fontSize: 14,
-                  color: Colors.white70,
+                style: TextStyle(fontSize: 14, color: Colors.white70),
+              ),
+              const SizedBox(height: 40),
+              const SizedBox(
+                width: 24,
+                height: 24,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2.5,
+                  color: Colors.white60,
                 ),
               ),
             ],

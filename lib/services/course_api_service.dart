@@ -15,7 +15,6 @@ class CourseApiService {
     };
   }
 
-  // ─── Estimation ────────────────────────────────────────────────────────
   static Future<Map<String, dynamic>> estimerCourse({
     required double dLat, required double dLng,
     required double aLat, required double aLng,
@@ -28,7 +27,6 @@ class CourseApiService {
     throw Exception('Erreur estimation');
   }
 
-  // ─── Commander ─────────────────────────────────────────────────────────
   static Future<CourseModel> commanderCourse({
     required double departLat, required double departLng,
     required String departAdresse,
@@ -52,7 +50,6 @@ class CourseApiService {
     throw Exception(body['message'] ?? 'Erreur commande');
   }
 
-  // ─── Course active passager (polling) ──────────────────────────────────
   static Future<CourseModel?> getCourseActive() async {
     final uri = Uri.parse('${ApiService.baseUrl}/courses/active');
     final response = await http.get(uri, headers: await _authHeaders());
@@ -60,13 +57,11 @@ class CourseApiService {
     return null;
   }
 
-  // ─── Annuler ───────────────────────────────────────────────────────────
   static Future<void> annulerCourse(int courseId) async {
     final uri = Uri.parse('${ApiService.baseUrl}/courses/$courseId/annuler');
     await http.delete(uri, headers: await _authHeaders());
   }
 
-  // ─── Paiement ──────────────────────────────────────────────────────────
   static Future<CourseModel> payer({
     required int courseId, required String modePaiement, required String codePin,
   }) async {
@@ -80,7 +75,6 @@ class CourseApiService {
     throw Exception(body['message'] ?? 'Erreur paiement');
   }
 
-  // ─── Notation ──────────────────────────────────────────────────────────
   static Future<CourseModel> noter({
     required int courseId, required int note, String? commentaire,
   }) async {
@@ -93,7 +87,17 @@ class CourseApiService {
     throw Exception('Erreur notation');
   }
 
-  // ─── Conducteurs actifs (carte) ────────────────────────────────────────
+  static Future<List<CourseModel>> getHistoriquePassager() async {
+    final uri = Uri.parse('${ApiService.baseUrl}/courses/historique');
+    final response = await http.get(uri, headers: await _authHeaders());
+    if (response.statusCode == 200) {
+      return (jsonDecode(response.body) as List)
+          .map((j) => CourseModel.fromJson(j))
+          .toList();
+    }
+    throw Exception('Erreur chargement historique');
+  }
+
   static Future<List<Map<String, dynamic>>> getConducteursActifs(double lat, double lng) async {
     final uri = Uri.parse('${ApiService.baseUrl}/courses/conducteurs-actifs?lat=$lat&lng=$lng');
     final response = await http.get(uri, headers: await _authHeaders());
@@ -101,7 +105,6 @@ class CourseApiService {
     return [];
   }
 
-  // ─── Conducteur : GPS ─────────────────────────────────────────────────
   static Future<void> updateLocalisation(double lat, double lng) async {
     final uri = Uri.parse('${ApiService.baseUrl}/courses/localisation');
     await http.put(uri,
@@ -110,7 +113,6 @@ class CourseApiService {
     );
   }
 
-  // ─── Conducteur : courses proches ──────────────────────────────────────
   static Future<List<CourseModel>> getCoursesProches() async {
     final uri = Uri.parse('${ApiService.baseUrl}/courses/proches');
     final response = await http.get(uri, headers: await _authHeaders());
@@ -120,7 +122,6 @@ class CourseApiService {
     return [];
   }
 
-  // ─── Conducteur : actions ─────────────────────────────────────────────
   static Future<CourseModel> accepterCourse(int id) async {
     final uri = Uri.parse('${ApiService.baseUrl}/courses/$id/accepter');
     final response = await http.post(uri, headers: await _authHeaders());
@@ -142,6 +143,13 @@ class CourseApiService {
     throw Exception('Erreur arrivée');
   }
 
+  static Future<CourseModel> terminerCourse(int id) async {
+    final uri = Uri.parse('${ApiService.baseUrl}/courses/$id/terminer');
+    final response = await http.post(uri, headers: await _authHeaders());
+    if (response.statusCode == 200) return CourseModel.fromJson(jsonDecode(response.body));
+    throw Exception('Erreur terminaison');
+  }
+
   static Future<CourseModel?> getCourseActiveConducteur() async {
     final uri = Uri.parse('${ApiService.baseUrl}/courses/conducteur/active');
     final response = await http.get(uri, headers: await _authHeaders());
@@ -149,7 +157,6 @@ class CourseApiService {
     return null;
   }
 
-  // ─── Conducteur : stats du jour ───────────────────────────────────────
   static Future<Map<String, dynamic>> getStatsConducteur() async {
     final uri = Uri.parse('${ApiService.baseUrl}/courses/conducteur/historique');
     final response = await http.get(uri, headers: await _authHeaders());

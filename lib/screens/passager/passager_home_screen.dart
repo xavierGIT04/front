@@ -3,10 +3,14 @@ import 'package:flutter/material.dart';
 import '../../models/course_model.dart';
 import '../../services/course_api_service.dart';
 import '../../services/auth_storage.dart';
+import '../../services/location_service.dart';
+import '../../services/nominatim_service.dart';
 import '../../utils/app_theme.dart';
 import '../../utils/widgets.dart';
 import '../../screens/login_screen.dart';
+import '../../widgets/map_widget.dart';
 import 'commander_course_screen.dart';
+import 'passager_historique_screen.dart';
 import 'suivi_course_screen.dart';
 
 class PassagerHomeScreen extends StatefulWidget {
@@ -20,6 +24,7 @@ class _PassagerHomeScreenState extends State<PassagerHomeScreen> {
   int _tab = 0;
   CourseModel? _courseActive;
   Timer? _pollingTimer;
+  bool _pollingActive = true;
 
   // Position simulée à Lomé, Togo
   final double _lat = 6.1375;
@@ -29,28 +34,55 @@ class _PassagerHomeScreenState extends State<PassagerHomeScreen> {
   void initState() {
     super.initState();
     _checkCourseActive();
-    // Polling toutes les 4 secondes
-    _pollingTimer = Timer.periodic(const Duration(seconds: 4), (_) => _checkCourseActive());
+    _pollingTimer = Timer.periodic(
+      const Duration(seconds: 4),
+      (_) { if (_pollingActive) _checkCourseActive(); },
+    );
   }
 
   Future<void> _checkCourseActive() async {
     try {
       final course = await CourseApiService.getCourseActive();
       if (!mounted) return;
+
       if (course != null && (course.acceptee || course.enCours || course.arrivee)) {
-        // Rediriger vers suivi si course acceptée
-        _pollingTimer?.cancel();
+        _stopPolling();
         if (mounted) {
           Navigator.pushReplacement(
             context,
-            MaterialPageRoute(builder: (_) => SuiviCourseScreen(course: course)),
+            MaterialPageRoute(builder: (_) => SuiviCourseConducteurScreen(course: course)),
           );
         }
-      } else {
+      } else if (course != null && course.enAttente) {
         setState(() => _courseActive = course);
+      } else {
+        if (_courseActive != null) {
+          setState(() => _courseActive = null);
+        }
       }
     } catch (_) {
-      setState(() => _courseActive = null);
+      if (mounted && _courseActive != null) {
+        setState(() => _courseActive = null);
+      }
+    }
+  }
+
+  void _stopPolling() {
+    _pollingActive = false;
+    _pollingTimer?.cancel();
+  }
+
+  Future<void> _annulerCourse() async {
+    if (_courseActive == null) return;
+    _pollingActive = false;
+    try {
+      await CourseApiService.annulerCourse(_courseActive!.id);
+      if (mounted) setState(() => _courseActive = null);
+    } catch (e) {
+      if (mounted) showSnack(context, 'Erreur annulation', error: true);
+    } finally {
+      await Future.delayed(const Duration(seconds: 2));
+      if (mounted) _pollingActive = true;
     }
   }
 
@@ -72,7 +104,6 @@ class _PassagerHomeScreenState extends State<PassagerHomeScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               child: Row(
                 children: [
-                  // Avatar
                   Container(
                     width: 44, height: 44,
                     decoration: BoxDecoration(
@@ -98,130 +129,124 @@ class _PassagerHomeScreenState extends State<PassagerHomeScreen> {
               ),
             ),
 
-            // ─── Carte (simulée) ──────────────────────────────────────
+            // ─── Contenu principal selon l'onglet ────────────────────
             Expanded(
-              child: Stack(
-                children: [
-                  // Fond carte simulé
-                  Container(
-                    width: double.infinity,
-                    color: const Color(0xFFDDE8D8),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
+              child: _tab == 1
+                  ? const HistoriqueScreen()
+                  : Stack(
                       children: [
-                        Icon(Icons.map_rounded, size: 80, color: Colors.grey.withOpacity(0.25)),
-                        const SizedBox(height: 8),
-                        Text('Carte – Lomé, Togo',
-                          style: TextStyle(color: Colors.grey.withOpacity(0.5), fontSize: 13)),
-                        const SizedBox(height: 4),
-                        Text('(Intégrer flutter_map + OpenStreetMap)',
-                          style: TextStyle(color: Colors.grey.withOpacity(0.4), fontSize: 11)),
-                      ],
-                    ),
-                  ),
-
-                  // Marqueur position actuelle
-                  const Center(
-                    child: Icon(Icons.my_location_rounded, color: Color(0xFF2196F3), size: 36),
-                  ),
-
-                  // Course EN_ATTENTE badge
-                  if (_courseActive != null && _courseActive!.enAttente)
-                    Positioned(
-                      top: 16, left: 16, right: 16,
-                      child: _CourseEnAttenteBanner(
-                        course: _courseActive!,
-                        onAnnuler: () async {
-                          await CourseApiService.annulerCourse(_courseActive!.id);
-                          setState(() => _courseActive = null);
-                        },
-                      ),
-                    ),
-                ],
-              ),
-            ),
-
-            // ─── Panel bas ────────────────────────────────────────────
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: const BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-                boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 10, offset: Offset(0, -4))],
-              ),
-              child: Column(
-                children: [
-                  Container(
-                    width: 40, height: 4,
-                    decoration: BoxDecoration(color: AppColors.border, borderRadius: BorderRadius.circular(2)),
-                  ),
-                  const SizedBox(height: 16),
-
-                  // Bouton commander
-                  if (_courseActive == null)
-                    GestureDetector(
-                      onTap: () async {
-                        final result = await Navigator.push<CourseModel>(
-                          context,
-                          MaterialPageRoute(builder: (_) => CommanderCourseScreen(
-                            departLat: _lat, departLng: _lng,
-                          )),
-                        );
-                        if (result != null) setState(() => _courseActive = result);
-                      },
-                      child: Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
-                        decoration: BoxDecoration(
-                          color: AppColors.background,
-                          borderRadius: BorderRadius.circular(14),
-                          border: Border.all(color: AppColors.border),
+                        Container(
+                          width: double.infinity,
+                          color: const Color(0xFFDDE8D8),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.map_rounded, size: 80, color: Colors.grey.withOpacity(0.25)),
+                              const SizedBox(height: 8),
+                              Text('Carte – Lomé, Togo',
+                                style: TextStyle(color: Colors.grey.withOpacity(0.5), fontSize: 13)),
+                            ],
+                          ),
                         ),
-                        child: Row(
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.all(8),
-                              decoration: BoxDecoration(
-                                color: AppColors.primary.withOpacity(0.15),
-                                shape: BoxShape.circle,
-                              ),
-                              child: const Icon(Icons.search_rounded, color: AppColors.primary, size: 20),
+                        const Center(
+                          child: Icon(Icons.my_location_rounded, color: Color(0xFF2196F3), size: 36),
+                        ),
+                        if (_courseActive != null && _courseActive!.enAttente)
+                          Positioned(
+                            top: 16, left: 16, right: 16,
+                            child: _CourseEnAttenteBanner(
+                              course: _courseActive!,
+                              onAnnuler: _annulerCourse,
                             ),
-                            const SizedBox(width: 12),
-                            const Text('Où voulez-vous aller ?',
-                              style: TextStyle(color: AppColors.textMedium, fontSize: 15)),
-                          ],
-                        ),
-                      ),
-                    ),
-
-                  if (_courseActive != null && _courseActive!.enAttente)
-                    const SizedBox(height: 0)
-                  else if (_courseActive == null)
-                    Column(
-                      children: [
-                        const SizedBox(height: 16),
-                        // Raccourcis rapides
-                        Row(
-                          children: [
-                            _QuickDestination(icon: Icons.home_rounded, label: 'Maison'),
-                            const SizedBox(width: 12),
-                            _QuickDestination(icon: Icons.work_rounded, label: 'Bureau'),
-                            const SizedBox(width: 12),
-                            _QuickDestination(icon: Icons.local_hospital_rounded, label: 'Hôpital'),
-                          ],
-                        ),
+                          ),
                       ],
                     ),
-                ],
-              ),
             ),
+
+            // ─── Panel bas (visible uniquement sur onglet Accueil) ───
+            if (_tab == 0)
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: const BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+                  boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 10, offset: Offset(0, -4))],
+                ),
+                child: Column(
+                  children: [
+                    Container(
+                      width: 40, height: 4,
+                      decoration: BoxDecoration(color: AppColors.border, borderRadius: BorderRadius.circular(2)),
+                    ),
+                    const SizedBox(height: 16),
+
+                    if (_courseActive == null)
+                      GestureDetector(
+                        onTap: () async {
+                          _stopPolling();
+                          final result = await Navigator.push<CourseModel>(
+                            context,
+                            MaterialPageRoute(builder: (_) => CommanderCourseScreen(
+                              departLat: _lat, departLng: _lng,
+                            )),
+                          );
+                          _pollingActive = true;
+                          _pollingTimer?.cancel();
+                          _pollingTimer = Timer.periodic(
+                            const Duration(seconds: 4),
+                            (_) { if (_pollingActive) _checkCourseActive(); },
+                          );
+                          if (result != null && mounted) {
+                            setState(() => _courseActive = result);
+                          }
+                        },
+                        child: Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+                          decoration: BoxDecoration(
+                            color: AppColors.background,
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(color: AppColors.border),
+                          ),
+                          child: Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  color: AppColors.primary.withOpacity(0.15),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(Icons.search_rounded, color: AppColors.primary, size: 20),
+                              ),
+                              const SizedBox(width: 12),
+                              const Text('Où voulez-vous aller ?',
+                                style: TextStyle(color: AppColors.textMedium, fontSize: 15)),
+                            ],
+                          ),
+                        ),
+                      ),
+
+                    if (_courseActive == null) ...[
+                      const SizedBox(height: 16),
+                      Row(
+                        children: [
+                          _QuickDestination(icon: Icons.home_rounded, label: 'Maison'),
+                          const SizedBox(width: 12),
+                          _QuickDestination(icon: Icons.work_rounded, label: 'Bureau'),
+                          const SizedBox(width: 12),
+                          _QuickDestination(icon: Icons.local_hospital_rounded, label: 'Hôpital'),
+                        ],
+                      ),
+                    ],
+                  ],
+                ),
+              ),
 
             // ─── Bottom Nav ───────────────────────────────────────────
             _BottomNav(
               currentTab: _tab,
               onTabChanged: (i) async {
-                if (i == 3) {
+                if (i == 2) {
                   await AuthStorage.clearSession();
                   if (!context.mounted) return;
                   Navigator.pushAndRemoveUntil(context,
@@ -338,7 +363,7 @@ class _BottomNav extends StatelessWidget {
         children: [
           _NavItem(icon: Icons.home_rounded, label: 'ACCUEIL', active: currentTab == 0, onTap: () => onTabChanged(0)),
           _NavItem(icon: Icons.history_rounded, label: 'HISTORIQUE', active: currentTab == 1, onTap: () => onTabChanged(1)),
-          _NavItem(icon: Icons.person_outline_rounded, label: 'PROFIL', active: currentTab == 3, onTap: () => onTabChanged(3)),
+          _NavItem(icon: Icons.logout_rounded, label: 'QUITTER', active: false, onTap: () => onTabChanged(2)),
         ],
       ),
     );

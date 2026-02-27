@@ -4,22 +4,27 @@ import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart';
 
 class ApiService {
-  // ⚠️ Modifie cette URL selon ton environnement
-  // Pour émulateur Android : http://10.0.2.2:8081
-  // Pour iOS simulateur   : http://localhost:8081
-  // Pour appareil physique : http://TON_IP_LOCAL:8081
-  static const String baseUrl = 'http://192.168.1.72:8081/api/v1';
+  // ✅ CORRECTION : URL selon l'environnement
+  // 🟢 Émulateur Android → 10.0.2.2 pointe vers localhost du PC
+  static const String baseUrl = 'http://10.0.2.2:8081/api/v1';
+
+  // 🟢 Simulateur iOS
+  // static const String baseUrl = 'http://localhost:8081/api/v1';
+
+  // 🟢 Appareil physique → remplace par ton IP locale
+  // Trouver ton IP : ipconfig (Windows) → cherche "Adresse IPv4"
+  // static const String baseUrl = 'http://192.168.X.X:8081/api/v1';
 
   // ─── OTP ──────────────────────────────────────────────────────────────────
 
   static Future<Map<String, dynamic>> demanderOtp(String telephone) async {
     final uri = Uri.parse('$baseUrl/auth/demander-otp');
 
-    // On utilise le paramètre body de http.post avec un Map<String, String>
-    // Sans jsonEncode, le package 'http' l'envoie par défaut en form-urlencoded
+    // ✅ CORRECTION : le backend Spring attend du JSON, pas du form-urlencoded
     final response = await http.post(
       uri,
-      body: {'telephone': telephone},
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'telephone': telephone}),
     );
 
     if (response.statusCode == 200) {
@@ -73,11 +78,11 @@ class ApiService {
     final streamedResponse = await request.send();
     final response = await http.Response.fromStream(streamedResponse);
 
-    if (response.statusCode == 200) {
+    if (response.statusCode == 200 || response.statusCode == 201) {
       return jsonDecode(response.body);
     }
-    final body = jsonDecode(response.body);
-    throw Exception(body['message'] ?? 'Erreur lors de l\'inscription');
+    final body = _parseError(response.body);
+    throw Exception(body);
   }
 
   static Future<Map<String, dynamic>> registerConducteur({
@@ -113,23 +118,19 @@ class ApiService {
       ),
     );
 
-    request.files.add(
-        await http.MultipartFile.fromPath('fileProfil', fileProfil.path));
-    request.files.add(
-        await http.MultipartFile.fromPath('filePermis', filePermis.path));
-    request.files
-        .add(await http.MultipartFile.fromPath('fileCni', fileCni.path));
-    request.files.add(
-        await http.MultipartFile.fromPath('fileVehicule', fileVehicule.path));
+    request.files.add(await http.MultipartFile.fromPath('fileProfil', fileProfil.path));
+    request.files.add(await http.MultipartFile.fromPath('filePermis', filePermis.path));
+    request.files.add(await http.MultipartFile.fromPath('fileCni', fileCni.path));
+    request.files.add(await http.MultipartFile.fromPath('fileVehicule', fileVehicule.path));
 
     final streamedResponse = await request.send();
     final response = await http.Response.fromStream(streamedResponse);
 
-    if (response.statusCode == 200) {
+    if (response.statusCode == 200 || response.statusCode == 201) {
       return jsonDecode(response.body);
     }
-    final body = jsonDecode(response.body);
-    throw Exception(body['message'] ?? 'Erreur lors de l\'inscription');
+    final body = _parseError(response.body);
+    throw Exception(body);
   }
 
   // ─── CONNEXION ────────────────────────────────────────────────────────────
@@ -159,6 +160,17 @@ class ApiService {
     }
 
     throw Exception('Numéro ou mot de passe incorrect');
+  }
+
+  // ─── Utilitaire privé ────────────────────────────────────────────────────
+
+  static String _parseError(String body) {
+    try {
+      final json = jsonDecode(body) as Map<String, dynamic>;
+      return json['message'] ?? json['error'] ?? 'Erreur inconnue';
+    } catch (_) {
+      return body.isNotEmpty ? body : 'Erreur inconnue';
+    }
   }
 }
 

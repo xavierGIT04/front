@@ -1,17 +1,25 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../models/course_model.dart';
 import '../../services/course_api_service.dart';
+import '../../services/nominatim_service.dart';
 import '../../utils/app_theme.dart';
 import '../../utils/widgets.dart';
 
 class CommanderCourseScreen extends StatefulWidget {
   final double departLat;
   final double departLng;
+  final double? destLat;
+  final double? destLng;
+  final String? destAdresse;
 
   const CommanderCourseScreen({
     super.key,
     required this.departLat,
     required this.departLng,
+    this.destLat,
+    this.destLng,
+    this.destAdresse,
   });
 
   @override
@@ -24,40 +32,67 @@ class _CommanderCourseScreenState extends State<CommanderCourseScreen> {
   bool _loading = false;
   Map<String, dynamic>? _estimation;
 
-  // Destinations simulées à Lomé
-  final List<Map<String, dynamic>> _suggestionsLome = [
-    {'adresse': 'Grand Marché, Lomé', 'lat': 6.1345, 'lng': 1.2194},
-    {'adresse': 'Aéroport Gnassingbé Eyadéma', 'lat': 6.1635, 'lng': 1.2545},
-    {'adresse': 'Université de Lomé', 'lat': 6.1147, 'lng': 1.2219},
-    {'adresse': 'Hôpital CHU Sylvanus Olympio', 'lat': 6.1289, 'lng': 1.2156},
-    {'adresse': 'Plage de Lomé', 'lat': 6.1199, 'lng': 1.2184},
-    {'adresse': 'Palais des Congrès', 'lat': 6.1318, 'lng': 1.2087},
-  ];
+  double? _destLat;
+  double? _destLng;
+  String? _destAdresse;
 
-  Map<String, dynamic>? _selectedDest;
+  List<NominatimResult> _suggestions = [];
+  bool _searching = false;
+  Timer? _debounce;
 
-  Future<void> _selectDestination(Map<String, dynamic> dest) async {
-    setState(() {
-      _selectedDest = dest;
-      _destCtrl.text = dest['adresse'];
-      _estimation = null;
-    });
-    // Calculer l'estimation
-    try {
-      final est = await CourseApiService.estimerCourse(
-        dLat: widget.departLat, dLng: widget.departLng,
-        aLat: dest['lat'], aLng: dest['lng'],
-      );
-      setState(() => _estimation = est);
-    } catch (_) {
-      // Estimation locale de secours
-      setState(() => _estimation = {'prix_estime': 1500, 'distance_km': 3.2});
+  @override
+  void initState() {
+    super.initState();
+    if (widget.destLat != null && widget.destLng != null && widget.destAdresse != null) {
+      _destLat = widget.destLat;
+      _destLng = widget.destLng;
+      _destAdresse = widget.destAdresse;
+      _destCtrl.text = widget.destAdresse!;
+      WidgetsBinding.instance.addPostFrameCallback((_) => _estimerCourse());
     }
   }
 
+  void _onSearchChanged(String query) {
+    _debounce?.cancel();
+    if (_destLat != null) {
+      setState(() { _destLat = null; _destLng = null; _destAdresse = null; _estimation = null; });
+    }
+    if (query.length < 3) {
+      setState(() => _suggestions = []);
+      return;
+    }
+    _debounce = Timer(const Duration(milliseconds: 500), () async {
+      setState(() => _searching = true);
+      final results = await NominatimService.search(query);
+      if (mounted) setState(() { _suggestions = results; _searching = false; });
+    });
+  }
+
+  void _selectSuggestion(NominatimResult result) {
+    setState(() {
+      _destLat = result.position.latitude;
+      _destLng = result.position.longitude;
+      _destAdresse = result.shortName;
+      _destCtrl.text = result.shortName;
+      _suggestions = [];
+    });
+    _estimerCourse();
+  }
+
+  Future<void> _estimerCourse() async {
+    if (_destLat == null || _destLng == null) return;
+    try {
+      final est = await CourseApiService.estimerCourse(
+        dLat: widget.departLat, dLng: widget.departLng,
+        aLat: _destLat!, aLng: _destLng!,
+      );
+      if (mounted) setState(() => _estimation = est);
+    } catch (_) {}
+  }
+
   Future<void> _commander() async {
-    if (_selectedDest == null) {
-      showSnack(context, 'Choisissez une destination', error: true);
+    if (_destLat == null || _destLng == null || _destAdresse == null) {
+      showSnack(context, 'Veuillez sélectionner une destination', error: true);
       return;
     }
     setState(() => _loading = true);
@@ -65,16 +100,15 @@ class _CommanderCourseScreenState extends State<CommanderCourseScreen> {
       final course = await CourseApiService.commanderCourse(
         departLat: widget.departLat,
         departLng: widget.departLng,
-        departAdresse: 'Ma position actuelle',
-        destLat: _selectedDest!['lat'],
-        destLng: _selectedDest!['lng'],
-        destAdresse: _selectedDest!['adresse'],
+        departAdresse: 'Lomé, Togo',
+        destLat: _destLat!,
+        destLng: _destLng!,
+        destAdresse: _destAdresse!,
         modePaiement: _modePaiement,
       );
-      if (!mounted) return;
-      Navigator.pop(context, course);
+      if (mounted) Navigator.pop(context, course);
     } catch (e) {
-      showSnack(context, e.toString().replaceAll('Exception: ', ''), error: true);
+      if (mounted) showSnack(context, e.toString().replaceAll('Exception: ', ''), error: true);
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -83,148 +117,165 @@ class _CommanderCourseScreenState extends State<CommanderCourseScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      resizeToAvoidBottomInset: true,
+      backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: const Text('Commander une course'),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded),
+          icon: const Icon(Icons.arrow_back_rounded, color: AppColors.textDark),
           onPressed: () => Navigator.pop(context),
         ),
+        title: const Text('Commander une course',
+          style: TextStyle(color: AppColors.textDark, fontWeight: FontWeight.bold, fontSize: 16)),
       ),
-      body: SafeArea(
-        child: Column(
-          children: [
-            // ─── Champ destination ───────────────────────────────────
-            Padding(
-              padding: const EdgeInsets.all(16),
+      body: Column(
+        children: [
+          Expanded(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(20),
               child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Départ (lecture seule)
+                  // Départ
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                    padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
                       color: Colors.white,
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(14),
                       border: Border.all(color: AppColors.border),
                     ),
-                    child: const Row(
+                    child: Row(
                       children: [
-                        Icon(Icons.my_location_rounded, color: Color(0xFF2196F3), size: 20),
-                        SizedBox(width: 12),
-                        Text('Ma position actuelle', style: TextStyle(color: AppColors.textMedium, fontSize: 14)),
+                        Container(
+                          width: 12, height: 12,
+                          decoration: const BoxDecoration(color: AppColors.success, shape: BoxShape.circle),
+                        ),
+                        const SizedBox(width: 12),
+                        const Expanded(
+                          child: Text('Votre position actuelle (Lomé)',
+                            style: TextStyle(color: AppColors.textMedium, fontSize: 14)),
+                        ),
                       ],
                     ),
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 12),
+
                   // Destination
+                  const Text('Destination',
+                    style: TextStyle(fontWeight: FontWeight.w600, color: AppColors.textDark, fontSize: 14)),
+                  const SizedBox(height: 8),
                   TextField(
                     controller: _destCtrl,
-                    readOnly: true,
+                    onChanged: _onSearchChanged,
                     decoration: InputDecoration(
-                      hintText: 'Où allez-vous ?',
-                      prefixIcon: const Icon(Icons.flag_rounded, color: AppColors.primary),
-                      suffixIcon: _selectedDest != null
-                          ? IconButton(
-                              icon: const Icon(Icons.close, color: AppColors.textLight),
-                              onPressed: () => setState(() { _selectedDest = null; _destCtrl.clear(); _estimation = null; }),
+                      hintText: 'Rechercher une adresse...',
+                      prefixIcon: const Icon(Icons.search_rounded, color: AppColors.primary),
+                      suffixIcon: _searching
+                          ? const Padding(
+                              padding: EdgeInsets.all(12),
+                              child: SizedBox(width: 20, height: 20,
+                                child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary)),
                             )
-                          : null,
+                          : _destLat != null
+                              ? const Icon(Icons.check_circle_rounded, color: AppColors.success)
+                              : null,
                     ),
+                  ),
+
+                  // Suggestions
+                  if (_suggestions.isNotEmpty)
+                    Container(
+                      margin: const EdgeInsets.only(top: 4),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: AppColors.border),
+                        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.08), blurRadius: 8)],
+                      ),
+                      child: ListView.separated(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        itemCount: _suggestions.length,
+                        separatorBuilder: (_, __) => const Divider(height: 1),
+                        itemBuilder: (_, i) {
+                          final s = _suggestions[i];
+                          return ListTile(
+                            dense: true,
+                            leading: const Icon(Icons.location_on_rounded, color: AppColors.primary, size: 18),
+                            title: Text(s.shortName, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                            subtitle: Text(s.displayName, style: const TextStyle(fontSize: 11, color: AppColors.textMedium), maxLines: 1, overflow: TextOverflow.ellipsis),
+                            onTap: () => _selectSuggestion(s),
+                          );
+                        },
+                      ),
+                    ),
+
+                  // Estimation
+                  if (_estimation != null) ...[
+                    const SizedBox(height: 20),
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: AppColors.primary.withOpacity(0.08),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: AppColors.primary.withOpacity(0.3)),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.route_rounded, color: AppColors.primary),
+                          const SizedBox(width: 12),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('Distance : ${(_estimation!['distance_km'] as num?)?.toStringAsFixed(1) ?? "?"} km',
+                                style: const TextStyle(fontSize: 13, color: AppColors.textMedium)),
+                              Text('Prix estimé : ${(_estimation!['prix_estime'] as num?)?.toInt() ?? "?"} FCFA',
+                                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: AppColors.primary)),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+
+                  // Mode paiement
+                  const SizedBox(height: 20),
+                  const Text('Mode de paiement',
+                    style: TextStyle(fontWeight: FontWeight.w600, color: AppColors.textDark, fontSize: 14)),
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      _PaiementChip(
+                        label: 'Espèces',
+                        icon: Icons.payments_rounded,
+                        selected: _modePaiement == 'ESPECES',
+                        onTap: () => setState(() => _modePaiement = 'ESPECES'),
+                      ),
+                      const SizedBox(width: 12),
+                      _PaiementChip(
+                        label: 'Mobile Money',
+                        icon: Icons.phone_android_rounded,
+                        selected: _modePaiement == 'MOBILE_MONEY',
+                        onTap: () => setState(() => _modePaiement = 'MOBILE_MONEY'),
+                      ),
+                    ],
                   ),
                 ],
               ),
             ),
+          ),
 
-            // ─── Liste suggestions ───────────────────────────────────
-            Expanded(
-              child: ListView.separated(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                itemCount: _suggestionsLome.length,
-                separatorBuilder: (_, __) => const Divider(height: 1),
-                itemBuilder: (_, i) {
-                  final dest = _suggestionsLome[i];
-                  final selected = _selectedDest?['adresse'] == dest['adresse'];
-                  return ListTile(
-                    contentPadding: const EdgeInsets.symmetric(vertical: 4),
-                    leading: Container(
-                      width: 40, height: 40,
-                      decoration: BoxDecoration(
-                        color: selected ? AppColors.primary.withOpacity(0.15) : AppColors.background,
-                        shape: BoxShape.circle,
-                      ),
-                      child: Icon(Icons.place_rounded,
-                        color: selected ? AppColors.primary : AppColors.textLight, size: 20),
-                    ),
-                    title: Text(dest['adresse'],
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: selected ? FontWeight.bold : FontWeight.normal,
-                        color: selected ? AppColors.textDark : AppColors.textDark,
-                      ),
-                    ),
-                    trailing: selected ? const Icon(Icons.check_circle, color: AppColors.primary) : null,
-                    onTap: () => _selectDestination(dest),
-                  );
-                },
-              ),
+          // Bouton commander
+          Padding(
+            padding: const EdgeInsets.all(20),
+            child: AppButton(
+              label: 'COMMANDER LA COURSE',
+              onPressed: _destLat != null ? _commander : null,
+              loading: _loading,
+              icon: Icons.motorcycle_rounded,
             ),
-
-            // ─── Panel estimation + commande ─────────────────────────
-            if (_estimation != null)
-              Container(
-                padding: const EdgeInsets.all(20),
-                decoration: const BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-                  boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 10, offset: Offset(0, -4))],
-                ),
-                child: Column(
-                  children: [
-                    // Info trajet
-                    Row(
-                      children: [
-                        _InfoPill(
-                          icon: Icons.route_rounded,
-                          label: '${_estimation!['distance_km']} km',
-                        ),
-                        const SizedBox(width: 12),
-                        _InfoPill(
-                          icon: Icons.access_time_rounded,
-                          label: '~${((_estimation!['distance_km'] as double) * 3).round()} min',
-                        ),
-                        const Spacer(),
-                        Text(
-                          '${_estimation!['prix_estime'].toInt()} FCFA',
-                          style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: AppColors.textDark),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-
-                    // Mode paiement
-                    Row(
-                      children: [
-                        const Text('Paiement :', style: TextStyle(fontWeight: FontWeight.w600, color: AppColors.textDark)),
-                        const SizedBox(width: 12),
-                        _PaiementChip(label: 'Espèces', value: 'ESPECES', selected: _modePaiement == 'ESPECES', onTap: () => setState(() => _modePaiement = 'ESPECES')),
-                        const SizedBox(width: 8),
-                        _PaiementChip(label: 'T-Money', value: 'TMONEY', selected: _modePaiement == 'TMONEY', onTap: () => setState(() => _modePaiement = 'TMONEY')),
-                        const SizedBox(width: 8),
-                        _PaiementChip(label: 'Moov', value: 'MOOV_MONEY', selected: _modePaiement == 'MOOV_MONEY', onTap: () => setState(() => _modePaiement = 'MOOV_MONEY')),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-
-                    PrimaryButton(
-                      label: 'Commander maintenant',
-                      onPressed: _commander,
-                      isLoading: _loading,
-                    ),
-                  ],
-                ),
-              ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -232,59 +283,36 @@ class _CommanderCourseScreenState extends State<CommanderCourseScreen> {
   @override
   void dispose() {
     _destCtrl.dispose();
+    _debounce?.cancel();
     super.dispose();
-  }
-}
-
-class _InfoPill extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  const _InfoPill({required this.icon, required this.label});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: AppColors.background,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 14, color: AppColors.textMedium),
-          const SizedBox(width: 4),
-          Text(label, style: const TextStyle(fontSize: 12, color: AppColors.textMedium)),
-        ],
-      ),
-    );
   }
 }
 
 class _PaiementChip extends StatelessWidget {
   final String label;
-  final String value;
+  final IconData icon;
   final bool selected;
   final VoidCallback onTap;
-  const _PaiementChip({required this.label, required this.value, required this.selected, required this.onTap});
+  const _PaiementChip({required this.label, required this.icon, required this.selected, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-        decoration: BoxDecoration(
-          color: selected ? AppColors.primary : Colors.white,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: selected ? AppColors.primary : AppColors.border),
-        ),
-        child: Text(label,
-          style: TextStyle(
-            fontSize: 11,
-            fontWeight: selected ? FontWeight.bold : FontWeight.normal,
-            color: selected ? Colors.black87 : AppColors.textMedium,
+    return Expanded(
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          decoration: BoxDecoration(
+            color: selected ? AppColors.primary.withOpacity(0.12) : Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: selected ? AppColors.primary : AppColors.border, width: selected ? 2 : 1),
+          ),
+          child: Column(
+            children: [
+              Icon(icon, color: selected ? AppColors.primary : AppColors.textMedium, size: 22),
+              const SizedBox(height: 4),
+              Text(label, style: TextStyle(fontSize: 12, color: selected ? AppColors.primary : AppColors.textMedium, fontWeight: selected ? FontWeight.bold : FontWeight.normal)),
+            ],
           ),
         ),
       ),
