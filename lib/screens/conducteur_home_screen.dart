@@ -529,7 +529,7 @@ class _ConducteurHomeScreenState extends State<ConducteurHomeScreen> {
                       }),
                   _NavItem(
                       icon: Icons.logout_rounded,
-                      label: 'QUITTER',
+                      label: 'DECONNECTER',
                       active: false,
                       onTap: _deconnexion),
                 ],
@@ -596,7 +596,7 @@ class _HistoriqueConducteur extends StatelessWidget {
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
-                  statut == 'TERMINEE' ? '✅ Terminée' : '❌ Annulée',
+                  statut == 'TERMINEE' ? ' Terminée' : ' Annulée',
                   style: TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.bold,

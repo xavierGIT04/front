@@ -38,7 +38,7 @@ class _PaiementScreenState extends State<PaiementScreen> {
       Navigator.pushAndRemoveUntil(
         context,
         MaterialPageRoute(builder: (_) => const PassagerHomeScreen()),
-        (r) => false,
+            (r) => false,
       );
     } catch (e) {
       if (mounted) showSnack(context, 'Paiement confirmé ', error: false);
@@ -47,10 +47,23 @@ class _PaiementScreenState extends State<PaiementScreen> {
       Navigator.pushAndRemoveUntil(
         context,
         MaterialPageRoute(builder: (_) => const PassagerHomeScreen()),
-        (r) => false,
+            (r) => false,
       );
     } finally {
       if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  /// Retourne le label et l'icône selon le mode de paiement
+  String _modePaiementLabel() {
+    switch (_course.modePaiement) {
+      case 'TMONEY':
+        return ' T-Money';
+      case 'MOOV_MONEY':
+        return ' Moov Money';
+      case 'ESPECES':
+      default:
+        return '💵 Espèces';
     }
   }
 
@@ -81,10 +94,10 @@ class _PaiementScreenState extends State<PaiementScreen> {
                   const Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('🎉 Course terminée !',
-                        style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: AppColors.textDark)),
+                      Text(' Course terminée !',
+                          style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: AppColors.textDark)),
                       Text('Merci d\'avoir utilisé Zém & Taxi',
-                        style: TextStyle(fontSize: 13, color: AppColors.textMedium)),
+                          style: TextStyle(fontSize: 13, color: AppColors.textMedium)),
                     ],
                   ),
                 ],
@@ -107,10 +120,10 @@ class _PaiementScreenState extends State<PaiementScreen> {
                       child: Column(
                         children: [
                           const Text('MONTANT À PAYER',
-                            style: TextStyle(fontSize: 11, color: AppColors.textMedium, letterSpacing: 1.5)),
+                              style: TextStyle(fontSize: 11, color: AppColors.textMedium, letterSpacing: 1.5)),
                           const SizedBox(height: 10),
                           Text('${prix.toInt()} FCFA',
-                            style: const TextStyle(fontSize: 40, fontWeight: FontWeight.w900, color: AppColors.primary)),
+                              style: const TextStyle(fontSize: 40, fontWeight: FontWeight.w900, color: AppColors.primary)),
                           const SizedBox(height: 8),
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
@@ -119,7 +132,7 @@ class _PaiementScreenState extends State<PaiementScreen> {
                               borderRadius: BorderRadius.circular(20),
                             ),
                             child: Text(
-                              _course.modePaiement == 'MOBILE_MONEY' ? '📱 Mobile Money' : '💵 Espèces',
+                              _modePaiementLabel(),
                               style: const TextStyle(fontSize: 13, color: AppColors.textMedium),
                             ),
                           ),
@@ -139,10 +152,10 @@ class _PaiementScreenState extends State<PaiementScreen> {
                         child: Column(
                           children: [
                             const Text('Notez votre conducteur',
-                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: AppColors.textDark)),
+                                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: AppColors.textDark)),
                             const SizedBox(height: 6),
                             Text(_course.conducteur!.nomComplet,
-                              style: const TextStyle(color: AppColors.textMedium, fontSize: 13)),
+                                style: const TextStyle(color: AppColors.textMedium, fontSize: 13)),
                             const SizedBox(height: 16),
                             Row(
                               mainAxisAlignment: MainAxisAlignment.center,

@@ -4,16 +4,16 @@ import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart';
 
 class ApiService {
-  // ✅ CORRECTION : URL selon l'environnement
-  // 🟢 Émulateur Android → 10.0.2.2 pointe vers localhost du PC
-  static const String baseUrl = 'http://192.168.1.75:8081/api/v1';
+  //  CORRECTION : URL selon l'environnement
+  //  Émulateur Android → 10.0.2.2 pointe vers localhost du PC
+  //static const String baseUrl = 'http://10.0.2.2:8081/api/v1';
 
-  // 🟢 Simulateur iOS
+  //  Simulateur iOS
   // static const String baseUrl = 'http://localhost:8081/api/v1';
 
-  // 🟢 Appareil physique → remplace par ton IP locale
+  //  Appareil physique → remplace par ton IP locale
   // Trouver ton IP : ipconfig (Windows) → cherche "Adresse IPv4"
-  // static const String baseUrl = 'http://192.168.X.X:8081/api/v1';
+  static const String baseUrl = 'http://localhost:8081/api/v1';
 
   // ─── OTP ──────────────────────────────────────────────────────────────────
 

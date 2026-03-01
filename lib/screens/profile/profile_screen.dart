@@ -201,7 +201,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               borderRadius: BorderRadius.circular(12),
             ),
             child: Text(
-              _profile?.role == 'CONDUCTEUR' ? '🏍️ Conducteur' : '🧳 Passager',
+              _profile?.role == 'CONDUCTEUR' ? ' Conducteur' : ' Passager',
               style: const TextStyle(color: Colors.white, fontSize: 13),
             ),
           ),

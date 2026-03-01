@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../models/course_model.dart';
 import '../../services/course_api_service.dart';
 import '../../services/auth_storage.dart';
+import '../../services/location_service.dart';
 import '../../services/notification_service.dart';
 import '../../services/profile_service.dart';
 import '../../utils/app_theme.dart';
@@ -12,7 +13,7 @@ import '../notifications/notifications_screen.dart';
 import '../profile/profile_screen.dart';
 import 'commander_course_screen.dart';
 import 'passager_historique_screen.dart';
-import 'passager_map_view.dart';           // ← AJOUT
+import 'passager_map_view.dart';
 import 'suivi_course_screen.dart';
 
 class PassagerHomeScreen extends StatefulWidget {
@@ -33,14 +34,17 @@ class _PassagerHomeScreenState extends State<PassagerHomeScreen> {
 
   String _prenom = '';
 
-  final double _lat = 6.1375;
-  final double _lng = 1.2123;
+  // ── CORRECTION : position GPS réelle (non codée en dur) ──────────────────
+  double _lat = 6.1375; // valeur par défaut Lomé (remplacée dès init)
+  double _lng = 1.2123;
+  bool _positionChargee = false;
 
   @override
   void initState() {
     super.initState();
     _loadPrenom();
     _loadBadge();
+    _chargerPositionGPS(); // ← Charge la vraie position au démarrage
     _checkCourseActive();
     _pollingTimer = Timer.periodic(
       const Duration(seconds: 4),
@@ -49,6 +53,26 @@ class _PassagerHomeScreenState extends State<PassagerHomeScreen> {
       },
     );
     Timer.periodic(const Duration(seconds: 30), (_) => _loadBadge());
+  }
+
+  /// Récupère la position GPS réelle de l'utilisateur
+  Future<void> _chargerPositionGPS() async {
+    try {
+      final pos = await LocationService.getCurrentPosition();
+      if (mounted) {
+        setState(() {
+          _lat = pos.latitude;
+          _lng = pos.longitude;
+          _positionChargee = true;
+        });
+        // Met à jour la position sur le backend (pour que le passager
+        // soit localisé correctement pour la recherche de conducteurs)
+        CourseApiService.updateLocalisation(_lat, _lng).catchError((_) {});
+      }
+    } catch (e) {
+      debugPrint('GPS error: $e');
+      if (mounted) setState(() => _positionChargee = true);
+    }
   }
 
   Future<void> _loadPrenom() async {
@@ -151,7 +175,7 @@ class _PassagerHomeScreenState extends State<PassagerHomeScreen> {
       body: SafeArea(
         child: Column(
           children: [
-            // ─── Header ─────────────────────────────────────────────
+            // ─── Header ───────────────────────────────────────────────
             Padding(
               padding:
               const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -174,7 +198,7 @@ class _PassagerHomeScreenState extends State<PassagerHomeScreen> {
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text('Bonjour 👋',
+                       Text("Bonjour 👋",
                           style: TextStyle(
                               fontSize: 12, color: AppColors.textMedium)),
                       Text(
@@ -187,6 +211,34 @@ class _PassagerHomeScreenState extends State<PassagerHomeScreen> {
                     ],
                   ),
                   const Spacer(),
+                  // Indicateur GPS en temps réel
+                  if (!_positionChargee)
+                    Container(
+                      margin: const EdgeInsets.only(right: 8),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: AppColors.primary.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          SizedBox(
+                              width: 12,
+                              height: 12,
+                              child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: AppColors.primary)),
+                          SizedBox(width: 6),
+                          Text('GPS',
+                              style: TextStyle(
+                                  fontSize: 10,
+                                  color: AppColors.primary,
+                                  fontWeight: FontWeight.bold)),
+                        ],
+                      ),
+                    ),
                   Stack(
                     clipBehavior: Clip.none,
                     children: [
@@ -223,11 +275,11 @@ class _PassagerHomeScreenState extends State<PassagerHomeScreen> {
               ),
             ),
 
-            // ─── Contenu principal ───────────────────────────────────
+            // ─── Carte avec position réelle ────────────────────────────
             Expanded(
               child: _tab == 1
                   ? const HistoriqueScreen()
-                  : PassagerMapView(          // ← REMPLACEMENT du placeholder
+                  : PassagerMapView(
                 lat: _lat,
                 lng: _lng,
                 courseActive: _courseActive,
@@ -235,7 +287,7 @@ class _PassagerHomeScreenState extends State<PassagerHomeScreen> {
               ),
             ),
 
-            // ─── Panel bas (onglet Accueil) ──────────────────────────
+            // ─── Panel bas (onglet Accueil) ────────────────────────────
             if (_tab == 0)
               Container(
                 padding: const EdgeInsets.all(20),
@@ -269,6 +321,7 @@ class _PassagerHomeScreenState extends State<PassagerHomeScreen> {
                             context,
                             MaterialPageRoute(
                               builder: (_) => CommanderCourseScreen(
+                                // ← Passe la VRAIE position GPS
                                 departLat: _lat,
                                 departLng: _lng,
                               ),
@@ -293,7 +346,8 @@ class _PassagerHomeScreenState extends State<PassagerHomeScreen> {
                               Container(
                                 padding: const EdgeInsets.all(8),
                                 decoration: BoxDecoration(
-                                  color: AppColors.primary.withOpacity(0.15),
+                                  color:
+                                  AppColors.primary.withOpacity(0.15),
                                   shape: BoxShape.circle,
                                 ),
                                 child: const Icon(Icons.search_rounded,
@@ -308,27 +362,12 @@ class _PassagerHomeScreenState extends State<PassagerHomeScreen> {
                           ),
                         ),
                       ),
-                    if (_courseActive == null) ...[
-                      const SizedBox(height: 16),
-                      Row(
-                        children: [
-                          _QuickDestination(
-                              icon: Icons.home_rounded, label: 'Maison'),
-                          const SizedBox(width: 12),
-                          _QuickDestination(
-                              icon: Icons.work_rounded, label: 'Bureau'),
-                          const SizedBox(width: 12),
-                          _QuickDestination(
-                              icon: Icons.local_hospital_rounded,
-                              label: 'Hôpital'),
-                        ],
-                      ),
-                    ],
+
                   ],
                 ),
               ),
 
-            // ─── Bottom Nav ──────────────────────────────────────────
+            // ─── Bottom Nav ────────────────────────────────────────────
             _BottomNav(
               currentTab: _tab,
               onTabChanged: (i) async {
@@ -352,7 +391,7 @@ class _PassagerHomeScreenState extends State<PassagerHomeScreen> {
   }
 }
 
-// ─── Widgets internes ─────────────────────────────────────────────────────
+// ─── Widgets internes ─────────────────────────────────────────────────────────
 
 class _QuickDestination extends StatelessWidget {
   final IconData icon;
@@ -409,7 +448,7 @@ class _BottomNav extends StatelessWidget {
               onTap: () => onTabChanged(1)),
           _NavItem(
               icon: Icons.logout_rounded,
-              label: 'QUITTER',
+              label: 'DECONNECTER',
               active: false,
               onTap: () => onTabChanged(2)),
         ],
@@ -445,9 +484,8 @@ class _NavItem extends StatelessWidget {
                   fontSize: 9,
                   fontWeight:
                   active ? FontWeight.bold : FontWeight.normal,
-                  color: active
-                      ? AppColors.primary
-                      : AppColors.textLight)),
+                  color:
+                  active ? AppColors.primary : AppColors.textLight)),
         ],
       ),
     );
