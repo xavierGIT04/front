@@ -8,6 +8,7 @@ import '../models/course_model.dart';
 import '../utils/app_theme.dart';
 import '../utils/widgets.dart';
 import 'login_screen.dart';
+import 'conducteur/conducteur_map_view.dart';          // ← AJOUT
 import 'conducteur/suivi_course_conducteur_screen.dart';
 import 'notifications/notifications_screen.dart';
 import 'profile/profile_screen.dart';
@@ -30,11 +31,9 @@ class _ConducteurHomeScreenState extends State<ConducteurHomeScreen> {
   bool _loadingCourses = false;
   Map<String, dynamic>? _stats;
 
-  // Notifications badge
   int _badgeCount = 0;
   final _notifService = NotificationService();
 
-  // Prénom
   String _prenom = '';
 
   double _lat = 6.1375;
@@ -47,7 +46,6 @@ class _ConducteurHomeScreenState extends State<ConducteurHomeScreen> {
     _loadBadge();
     _checkCourseActive();
     _loadStats();
-    // Badge toutes les 30s
     Timer.periodic(
         const Duration(seconds: 30), (_) => _loadBadge());
   }
@@ -95,7 +93,7 @@ class _ConducteurHomeScreenState extends State<ConducteurHomeScreen> {
       await _updateGPS();
       _pollingTimer = Timer.periodic(
           const Duration(seconds: 5),
-          (_) => _loadCoursesProches());
+              (_) => _loadCoursesProches());
       _gpsTimer = Timer.periodic(
           const Duration(seconds: 10), (_) => _updateGPS());
       _loadCoursesProches();
@@ -115,6 +113,7 @@ class _ConducteurHomeScreenState extends State<ConducteurHomeScreen> {
       _lat = 6.1375 + (random - 50) * 0.0001;
       _lng = 1.2123 + ((random + 25) % 100 - 50) * 0.0001;
       await CourseApiService.updateLocalisation(_lat, _lng);
+      if (mounted) setState(() {}); // rafraîchit la carte
     } catch (e) {
       debugPrint('Erreur GPS: $e');
     }
@@ -123,7 +122,7 @@ class _ConducteurHomeScreenState extends State<ConducteurHomeScreen> {
   Future<void> _checkCourseActive() async {
     try {
       final courseActive =
-          await CourseApiService.getCourseActiveConducteur();
+      await CourseApiService.getCourseActiveConducteur();
       if (courseActive != null && mounted) {
         Navigator.pushReplacement(
           context,
@@ -161,7 +160,7 @@ class _ConducteurHomeScreenState extends State<ConducteurHomeScreen> {
   Future<void> _accepterCourse(CourseModel course) async {
     try {
       final courseAcceptee =
-          await CourseApiService.accepterCourse(course.id);
+      await CourseApiService.accepterCourse(course.id);
       if (!mounted) return;
       _pollingTimer?.cancel();
       _gpsTimer?.cancel();
@@ -175,7 +174,7 @@ class _ConducteurHomeScreenState extends State<ConducteurHomeScreen> {
         if (_enLigne) {
           _pollingTimer = Timer.periodic(
               const Duration(seconds: 5),
-              (_) => _loadCoursesProches());
+                  (_) => _loadCoursesProches());
           _gpsTimer = Timer.periodic(
               const Duration(seconds: 10), (_) => _updateGPS());
           _loadCoursesProches();
@@ -183,8 +182,8 @@ class _ConducteurHomeScreenState extends State<ConducteurHomeScreen> {
       });
     } catch (e) {
       if (mounted)
-        showSnack(
-            context, e.toString().replaceAll('Exception: ', ''),
+        showSnack(context,
+            e.toString().replaceAll('Exception: ', ''),
             error: true);
     }
   }
@@ -197,7 +196,7 @@ class _ConducteurHomeScreenState extends State<ConducteurHomeScreen> {
     Navigator.pushAndRemoveUntil(
       context,
       MaterialPageRoute(builder: (_) => const LoginScreen()),
-      (r) => false,
+          (r) => false,
     );
   }
 
@@ -214,7 +213,6 @@ class _ConducteurHomeScreenState extends State<ConducteurHomeScreen> {
                   horizontal: 16, vertical: 12),
               child: Row(
                 children: [
-                  // Avatar → profil
                   GestureDetector(
                     onTap: _openProfile,
                     child: Container(
@@ -294,7 +292,7 @@ class _ConducteurHomeScreenState extends State<ConducteurHomeScreen> {
                     ),
                   ),
                   const Spacer(),
-                  // Cloche notifications avec badge
+                  // Cloche notifications
                   Container(
                     width: 44,
                     height: 44,
@@ -369,8 +367,7 @@ class _ConducteurHomeScreenState extends State<ConducteurHomeScreen> {
                       Container(
                         padding: const EdgeInsets.all(8),
                         decoration: BoxDecoration(
-                            color:
-                                AppColors.primary.withOpacity(0.15),
+                            color: AppColors.primary.withOpacity(0.15),
                             shape: BoxShape.circle),
                         child: const Icon(Icons.payments_outlined,
                             color: AppColors.primary, size: 22),
@@ -404,14 +401,11 @@ class _ConducteurHomeScreenState extends State<ConducteurHomeScreen> {
             Expanded(
               child: _currentTab == 2
                   ? _HistoriqueConducteur(stats: _stats)
-                  : Container(
-                      color: const Color(0xFFDDE8D8),
-                      child: Center(
-                        child: Icon(Icons.motorcycle_rounded,
-                            size: 60,
-                            color: Colors.grey.withOpacity(0.3)),
-                      ),
-                    ),
+                  : ConducteurMapView(        // ← REMPLACEMENT du placeholder
+                lat: _lat,
+                lng: _lng,
+                enLigne: _enLigne,
+              ),
             ),
 
             // ─── Panel demandes proches ───────────────────────────────
@@ -421,7 +415,7 @@ class _ConducteurHomeScreenState extends State<ConducteurHomeScreen> {
                 decoration: const BoxDecoration(
                   color: Colors.white,
                   borderRadius:
-                      BorderRadius.vertical(top: Radius.circular(24)),
+                  BorderRadius.vertical(top: Radius.circular(24)),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -450,8 +444,7 @@ class _ConducteurHomeScreenState extends State<ConducteurHomeScreen> {
                             padding: const EdgeInsets.symmetric(
                                 horizontal: 10, vertical: 4),
                             decoration: BoxDecoration(
-                              color:
-                                  AppColors.primary.withOpacity(0.15),
+                              color: AppColors.primary.withOpacity(0.15),
                               borderRadius: BorderRadius.circular(20),
                             ),
                             child: Text(
@@ -468,7 +461,7 @@ class _ConducteurHomeScreenState extends State<ConducteurHomeScreen> {
                       _MessageEtat(
                           icon: Icons.power_settings_new_rounded,
                           message:
-                              'Passez EN LIGNE pour recevoir des demandes',
+                          'Passez EN LIGNE pour recevoir des demandes',
                           color: AppColors.textLight)
                     else if (_loadingCourses)
                       const _MessageEtat(
@@ -477,25 +470,25 @@ class _ConducteurHomeScreenState extends State<ConducteurHomeScreen> {
                           color: AppColors.primary,
                           showLoading: true)
                     else if (_coursesProches.isEmpty)
-                      const _MessageEtat(
-                          icon: Icons.location_searching_rounded,
-                          message:
-                              'Aucune demande à proximité pour le moment',
-                          color: AppColors.textMedium)
-                    else
-                      SizedBox(
-                        height: 280,
-                        child: ListView.builder(
-                          itemCount: _coursesProches.length,
-                          itemBuilder: (context, index) {
-                            final course = _coursesProches[index];
-                            return _CourseCard(
-                                course: course,
-                                onAccepter: () =>
-                                    _accepterCourse(course));
-                          },
+                        const _MessageEtat(
+                            icon: Icons.location_searching_rounded,
+                            message:
+                            'Aucune demande à proximité pour le moment',
+                            color: AppColors.textMedium)
+                      else
+                        SizedBox(
+                          height: 280,
+                          child: ListView.builder(
+                            itemCount: _coursesProches.length,
+                            itemBuilder: (context, index) {
+                              final course = _coursesProches[index];
+                              return _CourseCard(
+                                  course: course,
+                                  onAccepter: () =>
+                                      _accepterCourse(course));
+                            },
+                          ),
                         ),
-                      ),
                   ],
                 ),
               ),
@@ -597,8 +590,8 @@ class _HistoriqueConducteur extends StatelessWidget {
                     horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
                   color: (statut == 'TERMINEE'
-                          ? AppColors.success
-                          : AppColors.error)
+                      ? AppColors.success
+                      : AppColors.error)
                       .withOpacity(0.1),
                   borderRadius: BorderRadius.circular(8),
                 ),
@@ -701,7 +694,8 @@ class _CourseCard extends StatelessWidget {
                           color: AppColors.textDark)),
                   Text(course.modePaiement ?? 'ESPÈCES',
                       style: const TextStyle(
-                          fontSize: 10, color: AppColors.textMedium)),
+                          fontSize: 10,
+                          color: AppColors.textMedium)),
                 ],
               ),
             ],
@@ -732,13 +726,15 @@ class _CourseCard extends StatelessWidget {
                   children: [
                     Text(course.departAdresse ?? 'Départ',
                         style: const TextStyle(
-                            fontSize: 13, color: AppColors.textDark),
+                            fontSize: 13,
+                            color: AppColors.textDark),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis),
                     const SizedBox(height: 12),
                     Text(course.destinationAdresse ?? 'Destination',
                         style: const TextStyle(
-                            fontSize: 13, color: AppColors.textDark),
+                            fontSize: 13,
+                            color: AppColors.textDark),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis),
                   ],
@@ -769,9 +765,9 @@ class _MessageEtat extends StatelessWidget {
   final bool showLoading;
   const _MessageEtat(
       {required this.icon,
-      required this.message,
-      required this.color,
-      this.showLoading = false});
+        required this.message,
+        required this.color,
+        this.showLoading = false});
 
   @override
   Widget build(BuildContext context) {
@@ -808,9 +804,9 @@ class _NavItem extends StatelessWidget {
   final VoidCallback onTap;
   const _NavItem(
       {required this.icon,
-      required this.label,
-      required this.active,
-      required this.onTap});
+        required this.label,
+        required this.active,
+        required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -827,7 +823,7 @@ class _NavItem extends StatelessWidget {
               style: TextStyle(
                   fontSize: 9,
                   fontWeight:
-                      active ? FontWeight.bold : FontWeight.normal,
+                  active ? FontWeight.bold : FontWeight.normal,
                   color: active
                       ? AppColors.primary
                       : AppColors.textLight)),

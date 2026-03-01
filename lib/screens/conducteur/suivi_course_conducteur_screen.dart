@@ -4,6 +4,7 @@ import '../../models/course_model.dart';
 import '../../services/course_api_service.dart';
 import '../../utils/app_theme.dart';
 import '../../utils/widgets.dart';
+import 'conducteur_map_view.dart';
 import '../conducteur_home_screen.dart';
 
 /// Écran de SUIVI côté CONDUCTEUR
@@ -33,14 +34,15 @@ class _SuiviCourseConducteurScreenState
 
   Future<void> _poll() async {
     try {
-      final updated = await CourseApiService.getCourseActiveConducteur();
+      final updated =
+      await CourseApiService.getCourseActiveConducteur();
       if (!mounted) return;
       if (updated == null) {
-        // Course terminée ou annulée côté passager
         _pollingTimer?.cancel();
         Navigator.pushAndRemoveUntil(
           context,
-          MaterialPageRoute(builder: (_) => const ConducteurHomeScreen()),
+          MaterialPageRoute(
+              builder: (_) => const ConducteurHomeScreen()),
               (r) => false,
         );
         return;
@@ -49,32 +51,26 @@ class _SuiviCourseConducteurScreenState
     } catch (_) {}
   }
 
-  /// Actions séquentielles du conducteur :
-  /// ACCEPTEE → demarrer → EN_COURS → signalerArrivee → ARRIVEE
-  /// (le passager confirme le paiement → course passe TERMINEE)
   Future<void> _actionPrincipale() async {
     setState(() => _loading = true);
     try {
       CourseModel updated;
 
       if (_course.acceptee) {
-        // Étape 1 : démarrer (passager à bord)
         updated = await CourseApiService.demarrerCourse(_course.id);
         if (mounted) setState(() => _course = updated);
       } else if (_course.enCours) {
-        // Étape 2 : signaler arrivée (déclenche l'écran paiement passager)
         updated = await CourseApiService.signalerArrivee(_course.id);
         if (mounted) setState(() => _course = updated);
-        // Le conducteur attend que le passager paie → polling continue
       } else if (_course.arrivee) {
-        // Étape 3 : attente paiement passager — pas d'action conducteur ici
-        // Le polling détectera quand la course passe TERMINEE
-        if (mounted) showSnack(context, 'En attente du paiement passager...');
+        if (mounted)
+          showSnack(context, 'En attente du paiement passager...');
         return;
       }
     } catch (e) {
       if (mounted)
-        showSnack(context, e.toString().replaceAll('Exception: ', ''),
+        showSnack(context,
+            e.toString().replaceAll('Exception: ', ''),
             error: true);
     } finally {
       if (mounted) setState(() => _loading = false);
@@ -104,23 +100,12 @@ class _SuiviCourseConducteurScreenState
       body: SafeArea(
         child: Column(
           children: [
-            // ─── Carte simulée ───────────────────────────────────────
+            // ─── Carte réelle CONDUCTEUR ─────────────────────────────
             Expanded(
-              child: Container(
-                color: const Color(0xFFDDE8D8),
-                child: Stack(
-                  children: [
-                    Center(
-                      child: Icon(Icons.map_rounded,
-                          size: 80,
-                          color: Colors.grey.withOpacity(0.2)),
-                    ),
-                    const Center(
-                      child: Icon(Icons.motorcycle_rounded,
-                          size: 48, color: AppColors.primary),
-                    ),
-                  ],
-                ),
+              child: ConducteurMapView(     // ← REMPLACEMENT du placeholder
+                lat: _course.departLat,
+                lng: _course.departLng,
+                enLigne: true,
               ),
             ),
 
@@ -157,7 +142,9 @@ class _SuiviCourseConducteurScreenState
                                 color: AppColors.success,
                                 shape: BoxShape.circle)),
                         Container(
-                            width: 2, height: 24, color: AppColors.border),
+                            width: 2,
+                            height: 24,
+                            color: AppColors.border),
                         Container(
                             width: 10,
                             height: 10,
@@ -180,7 +167,8 @@ class _SuiviCourseConducteurScreenState
                             ),
                             const SizedBox(height: 16),
                             Text(
-                              _course.destinationAdresse ?? 'Destination',
+                              _course.destinationAdresse ??
+                                  'Destination',
                               style: const TextStyle(
                                   fontSize: 13,
                                   color: AppColors.textDark),
@@ -207,7 +195,8 @@ class _SuiviCourseConducteurScreenState
                       width: double.infinity,
                       height: 52,
                       child: ElevatedButton(
-                        onPressed: _btnEnabled ? _actionPrincipale : null,
+                        onPressed:
+                        _btnEnabled ? _actionPrincipale : null,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: _course.arrivee
                               ? AppColors.textMedium
@@ -273,8 +262,8 @@ class _StatutBadge extends StatelessWidget {
       decoration: BoxDecoration(
         color: (cfg['color'] as Color).withOpacity(0.1),
         borderRadius: BorderRadius.circular(12),
-        border:
-        Border.all(color: (cfg['color'] as Color).withOpacity(0.3)),
+        border: Border.all(
+            color: (cfg['color'] as Color).withOpacity(0.3)),
       ),
       child: Text(
         cfg['label'] as String,

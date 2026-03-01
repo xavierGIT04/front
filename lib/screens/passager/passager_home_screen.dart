@@ -12,7 +12,8 @@ import '../notifications/notifications_screen.dart';
 import '../profile/profile_screen.dart';
 import 'commander_course_screen.dart';
 import 'passager_historique_screen.dart';
-import 'suivi_course_screen.dart';            // ← version PASSAGER corrigée
+import 'passager_map_view.dart';           // ← AJOUT
+import 'suivi_course_screen.dart';
 
 class PassagerHomeScreen extends StatefulWidget {
   const PassagerHomeScreen({super.key});
@@ -27,11 +28,9 @@ class _PassagerHomeScreenState extends State<PassagerHomeScreen> {
   Timer? _pollingTimer;
   bool _pollingActive = true;
 
-  // Notifications badge
   int _badgeCount = 0;
   final _notifService = NotificationService();
 
-  // Prénom affiché dans le header
   String _prenom = '';
 
   final double _lat = 6.1375;
@@ -45,11 +44,10 @@ class _PassagerHomeScreenState extends State<PassagerHomeScreen> {
     _checkCourseActive();
     _pollingTimer = Timer.periodic(
       const Duration(seconds: 4),
-      (_) {
+          (_) {
         if (_pollingActive) _checkCourseActive();
       },
     );
-    // Rafraîchit le badge toutes les 30s
     Timer.periodic(const Duration(seconds: 30), (_) => _loadBadge());
   }
 
@@ -104,7 +102,7 @@ class _PassagerHomeScreenState extends State<PassagerHomeScreen> {
     _pollingTimer?.cancel();
     _pollingTimer = Timer.periodic(
       const Duration(seconds: 4),
-      (_) {
+          (_) {
         if (_pollingActive) _checkCourseActive();
       },
     );
@@ -129,7 +127,6 @@ class _PassagerHomeScreenState extends State<PassagerHomeScreen> {
       context,
       MaterialPageRoute(builder: (_) => const NotificationsScreen()),
     );
-    // Rafraîchit le badge au retour
     _loadBadge();
   }
 
@@ -138,7 +135,6 @@ class _PassagerHomeScreenState extends State<PassagerHomeScreen> {
       context,
       MaterialPageRoute(builder: (_) => const ProfileScreen()),
     );
-    // Recharge le prénom au cas où il a été modifié
     _loadPrenom();
   }
 
@@ -158,10 +154,9 @@ class _PassagerHomeScreenState extends State<PassagerHomeScreen> {
             // ─── Header ─────────────────────────────────────────────
             Padding(
               padding:
-                  const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               child: Row(
                 children: [
-                  // Avatar → ouvre le profil
                   GestureDetector(
                     onTap: _openProfile,
                     child: Container(
@@ -183,9 +178,7 @@ class _PassagerHomeScreenState extends State<PassagerHomeScreen> {
                           style: TextStyle(
                               fontSize: 12, color: AppColors.textMedium)),
                       Text(
-                        _prenom.isNotEmpty
-                            ? _prenom
-                            : 'Où allez-vous ?',
+                        _prenom.isNotEmpty ? _prenom : 'Où allez-vous ?',
                         style: const TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.bold,
@@ -194,7 +187,6 @@ class _PassagerHomeScreenState extends State<PassagerHomeScreen> {
                     ],
                   ),
                   const Spacer(),
-                  // Cloche notifications avec badge
                   Stack(
                     clipBehavior: Clip.none,
                     children: [
@@ -235,45 +227,12 @@ class _PassagerHomeScreenState extends State<PassagerHomeScreen> {
             Expanded(
               child: _tab == 1
                   ? const HistoriqueScreen()
-                  : Stack(
-                      children: [
-                        // Carte placeholder
-                        Container(
-                          width: double.infinity,
-                          color: const Color(0xFFDDE8D8),
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(Icons.map_rounded,
-                                  size: 80,
-                                  color: Colors.grey.withOpacity(0.25)),
-                              const SizedBox(height: 8),
-                              Text('Carte – Lomé, Togo',
-                                  style: TextStyle(
-                                      color:
-                                          Colors.grey.withOpacity(0.5),
-                                      fontSize: 13)),
-                            ],
-                          ),
-                        ),
-                        const Center(
-                          child: Icon(Icons.my_location_rounded,
-                              color: Color(0xFF2196F3), size: 36),
-                        ),
-                        // Banner course en attente
-                        if (_courseActive != null &&
-                            _courseActive!.enAttente)
-                          Positioned(
-                            top: 16,
-                            left: 16,
-                            right: 16,
-                            child: _CourseEnAttenteBanner(
-                              course: _courseActive!,
-                              onAnnuler: _annulerCourse,
-                            ),
-                          ),
-                      ],
-                    ),
+                  : PassagerMapView(          // ← REMPLACEMENT du placeholder
+                lat: _lat,
+                lng: _lng,
+                courseActive: _courseActive,
+                onAnnuler: _annulerCourse,
+              ),
             ),
 
             // ─── Panel bas (onglet Accueil) ──────────────────────────
@@ -283,7 +242,7 @@ class _PassagerHomeScreenState extends State<PassagerHomeScreen> {
                 decoration: const BoxDecoration(
                   color: Colors.white,
                   borderRadius:
-                      BorderRadius.vertical(top: Radius.circular(24)),
+                  BorderRadius.vertical(top: Radius.circular(24)),
                   boxShadow: [
                     BoxShadow(
                         color: Colors.black12,
@@ -306,7 +265,7 @@ class _PassagerHomeScreenState extends State<PassagerHomeScreen> {
                         onTap: () async {
                           _stopPolling();
                           final result =
-                              await Navigator.push<CourseModel>(
+                          await Navigator.push<CourseModel>(
                             context,
                             MaterialPageRoute(
                               builder: (_) => CommanderCourseScreen(
@@ -334,8 +293,7 @@ class _PassagerHomeScreenState extends State<PassagerHomeScreen> {
                               Container(
                                 padding: const EdgeInsets.all(8),
                                 decoration: BoxDecoration(
-                                  color: AppColors.primary
-                                      .withOpacity(0.15),
+                                  color: AppColors.primary.withOpacity(0.15),
                                   shape: BoxShape.circle,
                                 ),
                                 child: const Icon(Icons.search_rounded,
@@ -355,12 +313,10 @@ class _PassagerHomeScreenState extends State<PassagerHomeScreen> {
                       Row(
                         children: [
                           _QuickDestination(
-                              icon: Icons.home_rounded,
-                              label: 'Maison'),
+                              icon: Icons.home_rounded, label: 'Maison'),
                           const SizedBox(width: 12),
                           _QuickDestination(
-                              icon: Icons.work_rounded,
-                              label: 'Bureau'),
+                              icon: Icons.work_rounded, label: 'Bureau'),
                           const SizedBox(width: 12),
                           _QuickDestination(
                               icon: Icons.local_hospital_rounded,
@@ -383,7 +339,7 @@ class _PassagerHomeScreenState extends State<PassagerHomeScreen> {
                       context,
                       MaterialPageRoute(
                           builder: (_) => const LoginScreen()),
-                      (r) => false);
+                          (r) => false);
                 } else {
                   setState(() => _tab = i);
                 }
@@ -397,78 +353,6 @@ class _PassagerHomeScreenState extends State<PassagerHomeScreen> {
 }
 
 // ─── Widgets internes ─────────────────────────────────────────────────────
-
-class _CourseEnAttenteBanner extends StatelessWidget {
-  final CourseModel course;
-  final VoidCallback onAnnuler;
-  const _CourseEnAttenteBanner(
-      {required this.course, required this.onAnnuler});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-              color: Colors.black.withOpacity(0.1), blurRadius: 12)
-        ],
-      ),
-      child: Column(
-        children: [
-          Row(
-            children: [
-              const SizedBox(
-                width: 20,
-                height: 20,
-                child: CircularProgressIndicator(
-                    strokeWidth: 2.5, color: AppColors.primary),
-              ),
-              const SizedBox(width: 12),
-              const Expanded(
-                child: Text('Recherche d\'un conducteur...',
-                    style: TextStyle(fontWeight: FontWeight.bold)),
-              ),
-              TextButton(
-                onPressed: onAnnuler,
-                child: const Text('Annuler',
-                    style: TextStyle(color: AppColors.error)),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              const Icon(Icons.place, color: AppColors.success, size: 16),
-              const SizedBox(width: 6),
-              Expanded(
-                  child: Text(course.departAdresse ?? 'Départ',
-                      style: const TextStyle(
-                          fontSize: 12, color: AppColors.textMedium))),
-            ],
-          ),
-          const SizedBox(height: 4),
-          Row(
-            children: [
-              const Icon(Icons.flag, color: AppColors.primary, size: 16),
-              const SizedBox(width: 6),
-              Expanded(
-                  child: Text(course.destinationAdresse ?? 'Destination',
-                      style: const TextStyle(
-                          fontSize: 12, color: AppColors.textMedium))),
-              Text('${course.prixEstime?.toInt()} FCFA',
-                  style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.textDark)),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
 
 class _QuickDestination extends StatelessWidget {
   final IconData icon;
@@ -541,9 +425,9 @@ class _NavItem extends StatelessWidget {
   final VoidCallback onTap;
   const _NavItem(
       {required this.icon,
-      required this.label,
-      required this.active,
-      required this.onTap});
+        required this.label,
+        required this.active,
+        required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -560,7 +444,7 @@ class _NavItem extends StatelessWidget {
               style: TextStyle(
                   fontSize: 9,
                   fontWeight:
-                      active ? FontWeight.bold : FontWeight.normal,
+                  active ? FontWeight.bold : FontWeight.normal,
                   color: active
                       ? AppColors.primary
                       : AppColors.textLight)),
