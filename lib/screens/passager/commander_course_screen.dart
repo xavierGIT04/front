@@ -29,6 +29,10 @@ class CommanderCourseScreen extends StatefulWidget {
 class _CommanderCourseScreenState extends State<CommanderCourseScreen> {
   final _destCtrl = TextEditingController();
   String _modePaiement = 'ESPECES';
+
+  //  NOUVEAU : choix du type de véhicule (ZEM par défaut)
+  String _typeVehicule = 'ZEM';
+
   bool _loading = false;
   Map<String, dynamic>? _estimation;
 
@@ -43,19 +47,27 @@ class _CommanderCourseScreenState extends State<CommanderCourseScreen> {
   @override
   void initState() {
     super.initState();
-    if (widget.destLat != null && widget.destLng != null && widget.destAdresse != null) {
+    if (widget.destLat != null &&
+        widget.destLng != null &&
+        widget.destAdresse != null) {
       _destLat = widget.destLat;
       _destLng = widget.destLng;
       _destAdresse = widget.destAdresse;
       _destCtrl.text = widget.destAdresse!;
-      WidgetsBinding.instance.addPostFrameCallback((_) => _estimerCourse());
+      WidgetsBinding.instance
+          .addPostFrameCallback((_) => _estimerCourse());
     }
   }
 
   void _onSearchChanged(String query) {
     _debounce?.cancel();
     if (_destLat != null) {
-      setState(() { _destLat = null; _destLng = null; _destAdresse = null; _estimation = null; });
+      setState(() {
+        _destLat = null;
+        _destLng = null;
+        _destAdresse = null;
+        _estimation = null;
+      });
     }
     if (query.length < 3) {
       setState(() => _suggestions = []);
@@ -64,7 +76,11 @@ class _CommanderCourseScreenState extends State<CommanderCourseScreen> {
     _debounce = Timer(const Duration(milliseconds: 500), () async {
       setState(() => _searching = true);
       final results = await NominatimService.search(query);
-      if (mounted) setState(() { _suggestions = results; _searching = false; });
+      if (mounted)
+        setState(() {
+          _suggestions = results;
+          _searching = false;
+        });
     });
   }
 
@@ -83,8 +99,10 @@ class _CommanderCourseScreenState extends State<CommanderCourseScreen> {
     if (_destLat == null || _destLng == null) return;
     try {
       final est = await CourseApiService.estimerCourse(
-        dLat: widget.departLat, dLng: widget.departLng,
-        aLat: _destLat!, aLng: _destLng!,
+        dLat: widget.departLat,
+        dLng: widget.departLng,
+        aLat: _destLat!,
+        aLng: _destLng!,
       );
       if (mounted) setState(() => _estimation = est);
     } catch (_) {}
@@ -92,7 +110,8 @@ class _CommanderCourseScreenState extends State<CommanderCourseScreen> {
 
   Future<void> _commander() async {
     if (_destLat == null || _destLng == null || _destAdresse == null) {
-      showSnack(context, 'Veuillez sélectionner une destination', error: true);
+      showSnack(context, 'Veuillez sélectionner une destination',
+          error: true);
       return;
     }
     setState(() => _loading = true);
@@ -105,10 +124,13 @@ class _CommanderCourseScreenState extends State<CommanderCourseScreen> {
         destLng: _destLng!,
         destAdresse: _destAdresse!,
         modePaiement: _modePaiement,
+        typeVehicule: _typeVehicule, //  NOUVEAU
       );
       if (mounted) Navigator.pop(context, course);
     } catch (e) {
-      if (mounted) showSnack(context, e.toString().replaceAll('Exception: ', ''), error: true);
+      if (mounted)
+        showSnack(context, e.toString().replaceAll('Exception: ', ''),
+            error: true);
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -122,11 +144,15 @@ class _CommanderCourseScreenState extends State<CommanderCourseScreen> {
         backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_rounded, color: AppColors.textDark),
+          icon: const Icon(Icons.arrow_back_rounded,
+              color: AppColors.textDark),
           onPressed: () => Navigator.pop(context),
         ),
         title: const Text('Commander une course',
-          style: TextStyle(color: AppColors.textDark, fontWeight: FontWeight.bold, fontSize: 16)),
+            style: TextStyle(
+                color: AppColors.textDark,
+                fontWeight: FontWeight.bold,
+                fontSize: 16)),
       ),
       body: Column(
         children: [
@@ -136,7 +162,7 @@ class _CommanderCourseScreenState extends State<CommanderCourseScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Départ
+                  // ── Départ ─────────────────────────────────────────
                   Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
@@ -147,42 +173,56 @@ class _CommanderCourseScreenState extends State<CommanderCourseScreen> {
                     child: Row(
                       children: [
                         Container(
-                          width: 12, height: 12,
-                          decoration: const BoxDecoration(color: AppColors.success, shape: BoxShape.circle),
+                          width: 12,
+                          height: 12,
+                          decoration: const BoxDecoration(
+                              color: AppColors.success,
+                              shape: BoxShape.circle),
                         ),
                         const SizedBox(width: 12),
                         const Expanded(
                           child: Text('Votre position actuelle (Lomé)',
-                            style: TextStyle(color: AppColors.textMedium, fontSize: 14)),
+                              style: TextStyle(
+                                  color: AppColors.textMedium,
+                                  fontSize: 14)),
                         ),
                       ],
                     ),
                   ),
                   const SizedBox(height: 12),
 
-                  // Destination
+                  // ── Destination ────────────────────────────────────
                   const Text('Destination',
-                    style: TextStyle(fontWeight: FontWeight.w600, color: AppColors.textDark, fontSize: 14)),
+                      style: TextStyle(
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.textDark,
+                          fontSize: 14)),
                   const SizedBox(height: 8),
                   TextField(
                     controller: _destCtrl,
                     onChanged: _onSearchChanged,
                     decoration: InputDecoration(
                       hintText: 'Rechercher une adresse...',
-                      prefixIcon: const Icon(Icons.search_rounded, color: AppColors.primary),
+                      prefixIcon: const Icon(Icons.search_rounded,
+                          color: AppColors.primary),
                       suffixIcon: _searching
                           ? const Padding(
-                              padding: EdgeInsets.all(12),
-                              child: SizedBox(width: 20, height: 20,
-                                child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary)),
-                            )
+                        padding: EdgeInsets.all(12),
+                        child: SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: AppColors.primary)),
+                      )
                           : _destLat != null
-                              ? const Icon(Icons.check_circle_rounded, color: AppColors.success)
-                              : null,
+                          ? const Icon(Icons.check_circle_rounded,
+                          color: AppColors.success)
+                          : null,
                     ),
                   ),
 
-                  // Suggestions
+                  // ── Suggestions ────────────────────────────────────
                   if (_suggestions.isNotEmpty)
                     Container(
                       margin: const EdgeInsets.only(top: 4),
@@ -190,27 +230,41 @@ class _CommanderCourseScreenState extends State<CommanderCourseScreen> {
                         color: Colors.white,
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(color: AppColors.border),
-                        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.08), blurRadius: 8)],
+                        boxShadow: [
+                          BoxShadow(
+                              color: Colors.black.withOpacity(0.08),
+                              blurRadius: 8)
+                        ],
                       ),
                       child: ListView.separated(
                         shrinkWrap: true,
                         physics: const NeverScrollableScrollPhysics(),
                         itemCount: _suggestions.length,
-                        separatorBuilder: (_, __) => const Divider(height: 1),
+                        separatorBuilder: (_, __) =>
+                        const Divider(height: 1),
                         itemBuilder: (_, i) {
                           final s = _suggestions[i];
                           return ListTile(
                             dense: true,
-                            leading: const Icon(Icons.location_on_rounded, color: AppColors.primary, size: 18),
-                            title: Text(s.shortName, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-                            subtitle: Text(s.displayName, style: const TextStyle(fontSize: 11, color: AppColors.textMedium), maxLines: 1, overflow: TextOverflow.ellipsis),
+                            leading: const Icon(Icons.location_on_rounded,
+                                color: AppColors.primary, size: 18),
+                            title: Text(s.shortName,
+                                style: const TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600)),
+                            subtitle: Text(s.displayName,
+                                style: const TextStyle(
+                                    fontSize: 11,
+                                    color: AppColors.textMedium),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis),
                             onTap: () => _selectSuggestion(s),
                           );
                         },
                       ),
                     ),
 
-                  // Estimation
+                  // ── Estimation ─────────────────────────────────────
                   if (_estimation != null) ...[
                     const SizedBox(height: 20),
                     Container(
@@ -218,19 +272,30 @@ class _CommanderCourseScreenState extends State<CommanderCourseScreen> {
                       decoration: BoxDecoration(
                         color: AppColors.primary.withOpacity(0.08),
                         borderRadius: BorderRadius.circular(14),
-                        border: Border.all(color: AppColors.primary.withOpacity(0.3)),
+                        border: Border.all(
+                            color: AppColors.primary.withOpacity(0.3)),
                       ),
                       child: Row(
                         children: [
-                          const Icon(Icons.route_rounded, color: AppColors.primary),
+                          const Icon(Icons.route_rounded,
+                              color: AppColors.primary),
                           const SizedBox(width: 12),
                           Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text('Distance : ${(_estimation!['distance_km'] as num?)?.toStringAsFixed(1) ?? "?"} km',
-                                style: const TextStyle(fontSize: 13, color: AppColors.textMedium)),
-                              Text('Prix estimé : ${(_estimation!['prix_estime'] as num?)?.toInt() ?? "?"} FCFA',
-                                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: AppColors.primary)),
+                              Text(
+                                'Distance : ${(_estimation!['distance_km'] as num?)?.toStringAsFixed(1) ?? "?"} km',
+                                style: const TextStyle(
+                                    fontSize: 13,
+                                    color: AppColors.textMedium),
+                              ),
+                              Text(
+                                'Prix estimé : ${(_estimation!['prix_estime'] as num?)?.toInt() ?? "?"} FCFA',
+                                style: const TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w900,
+                                    color: AppColors.primary),
+                              ),
                             ],
                           ),
                         ],
@@ -238,10 +303,43 @@ class _CommanderCourseScreenState extends State<CommanderCourseScreen> {
                     ),
                   ],
 
-                  // Mode paiement
+                  //  NOUVEAU — Choix type de véhicule
+                  const SizedBox(height: 24),
+                  const Text('Type de transport',
+                      style: TextStyle(
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.textDark,
+                          fontSize: 14)),
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      _VehiculeChip(
+                        emoji: '🏍️',
+                        label: 'Zém',
+                        sublabel: 'Moto-taxi',
+                        selected: _typeVehicule == 'ZEM',
+                        onTap: () =>
+                            setState(() => _typeVehicule = 'ZEM'),
+                      ),
+                      const SizedBox(width: 12),
+                      _VehiculeChip(
+                        emoji: '🚕',
+                        label: 'Taxi',
+                        sublabel: 'Voiture',
+                        selected: _typeVehicule == 'TAXI',
+                        onTap: () =>
+                            setState(() => _typeVehicule = 'TAXI'),
+                      ),
+                    ],
+                  ),
+
+                  // ── Mode paiement ──────────────────────────────────
                   const SizedBox(height: 20),
                   const Text('Mode de paiement',
-                    style: TextStyle(fontWeight: FontWeight.w600, color: AppColors.textDark, fontSize: 14)),
+                      style: TextStyle(
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.textDark,
+                          fontSize: 14)),
                   const SizedBox(height: 10),
                   Row(
                     children: [
@@ -249,14 +347,16 @@ class _CommanderCourseScreenState extends State<CommanderCourseScreen> {
                         label: 'Espèces',
                         icon: Icons.payments_rounded,
                         selected: _modePaiement == 'ESPECES',
-                        onTap: () => setState(() => _modePaiement = 'ESPECES'),
+                        onTap: () =>
+                            setState(() => _modePaiement = 'ESPECES'),
                       ),
                       const SizedBox(width: 12),
                       _PaiementChip(
                         label: 'Mobile Money',
                         icon: Icons.phone_android_rounded,
                         selected: _modePaiement == 'MOBILE_MONEY',
-                        onTap: () => setState(() => _modePaiement = 'MOBILE_MONEY'),
+                        onTap: () => setState(
+                                () => _modePaiement = 'MOBILE_MONEY'),
                       ),
                     ],
                   ),
@@ -265,14 +365,18 @@ class _CommanderCourseScreenState extends State<CommanderCourseScreen> {
             ),
           ),
 
-          // Bouton commander
+          // ── Bouton commander ───────────────────────────────────────
           Padding(
             padding: const EdgeInsets.all(20),
             child: AppButton(
-              label: 'COMMANDER LA COURSE',
+              label: _typeVehicule == 'ZEM'
+                  ? 'COMMANDER UN ZÉM 🏍️'
+                  : 'COMMANDER UN TAXI 🚕',
               onPressed: _destLat != null ? _commander : null,
               loading: _loading,
-              icon: Icons.motorcycle_rounded,
+              color: _typeVehicule == 'ZEM'
+                  ? AppColors.primary
+                  : const Color(0xFF2196F3),
             ),
           ),
         ],
@@ -288,12 +392,89 @@ class _CommanderCourseScreenState extends State<CommanderCourseScreen> {
   }
 }
 
+// ─── Chip type véhicule ──────────────────────────────────────────────────
+
+class _VehiculeChip extends StatelessWidget {
+  final String emoji;
+  final String label;
+  final String sublabel;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _VehiculeChip({
+    required this.emoji,
+    required this.label,
+    required this.sublabel,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final color =
+    label == 'Zém' ? AppColors.primary : const Color(0xFF2196F3);
+    return Expanded(
+      child: GestureDetector(
+        onTap: onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          decoration: BoxDecoration(
+            color: selected ? color.withOpacity(0.1) : Colors.white,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: selected ? color : AppColors.border,
+              width: selected ? 2.5 : 1,
+            ),
+            boxShadow: selected
+                ? [
+              BoxShadow(
+                  color: color.withOpacity(0.2),
+                  blurRadius: 8,
+                  offset: const Offset(0, 3))
+            ]
+                : [],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(emoji, style: const TextStyle(fontSize: 32)),
+              const SizedBox(height: 6),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.bold,
+                  color: selected ? color : AppColors.textDark,
+                ),
+              ),
+              Text(
+                sublabel,
+                style: const TextStyle(
+                    fontSize: 11, color: AppColors.textMedium),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Chip paiement ───────────────────────────────────────────────────────
+
 class _PaiementChip extends StatelessWidget {
   final String label;
   final IconData icon;
   final bool selected;
   final VoidCallback onTap;
-  const _PaiementChip({required this.label, required this.icon, required this.selected, required this.onTap});
+
+  const _PaiementChip({
+    required this.label,
+    required this.icon,
+    required this.selected,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -303,15 +484,33 @@ class _PaiementChip extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.symmetric(vertical: 12),
           decoration: BoxDecoration(
-            color: selected ? AppColors.primary.withOpacity(0.12) : Colors.white,
+            color: selected
+                ? AppColors.primary.withOpacity(0.12)
+                : Colors.white,
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: selected ? AppColors.primary : AppColors.border, width: selected ? 2 : 1),
+            border: Border.all(
+              color: selected ? AppColors.primary : AppColors.border,
+              width: selected ? 2 : 1,
+            ),
           ),
           child: Column(
             children: [
-              Icon(icon, color: selected ? AppColors.primary : AppColors.textMedium, size: 22),
+              Icon(icon,
+                  color:
+                  selected ? AppColors.primary : AppColors.textMedium,
+                  size: 22),
               const SizedBox(height: 4),
-              Text(label, style: TextStyle(fontSize: 12, color: selected ? AppColors.primary : AppColors.textMedium, fontWeight: selected ? FontWeight.bold : FontWeight.normal)),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: selected
+                      ? AppColors.primary
+                      : AppColors.textMedium,
+                  fontWeight:
+                  selected ? FontWeight.bold : FontWeight.normal,
+                ),
+              ),
             ],
           ),
         ),

@@ -99,7 +99,7 @@ class _ConducteurHomeScreenState extends State<ConducteurHomeScreen> {
       _gpsTimer = Timer.periodic(
           const Duration(seconds: 10), (_) => _updateGPS());
       _loadCoursesProches();
-      if (mounted) showSnack(context, '✅ Vous êtes maintenant EN LIGNE');
+      if (mounted) showSnack(context, ' Vous êtes maintenant EN LIGNE');
     } else {
       _pollingTimer?.cancel();
       _gpsTimer?.cancel();

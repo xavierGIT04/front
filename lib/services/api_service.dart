@@ -20,7 +20,7 @@ class ApiService {
   static Future<Map<String, dynamic>> demanderOtp(String telephone) async {
     final uri = Uri.parse('$baseUrl/auth/demander-otp');
 
-    // ✅ CORRECTION : le backend Spring attend du JSON, pas du form-urlencoded
+    //  CORRECTION : le backend Spring attend du JSON, pas du form-urlencoded
     final response = await http.post(
       uri,
       headers: {'Content-Type': 'application/json'},
@@ -92,6 +92,7 @@ class ApiService {
     required String password,
     required String immatriculation,
     required String numeroPermis,
+    required String typeVehicule, //  NOUVEAU — 'ZEM' ou 'TAXI'
     required File fileProfil,
     required File filePermis,
     required File fileCni,
@@ -108,7 +109,7 @@ class ApiService {
       'profil': 'CONDUCTEUR',
       'immatriculation': immatriculation,
       'numero_permis': numeroPermis,
-      'type_vehicule': 'ZEM',
+      'type_vehicule': typeVehicule, //  NOUVEAU
     };
     request.files.add(
       http.MultipartFile.fromString(
@@ -118,10 +119,14 @@ class ApiService {
       ),
     );
 
-    request.files.add(await http.MultipartFile.fromPath('fileProfil', fileProfil.path));
-    request.files.add(await http.MultipartFile.fromPath('filePermis', filePermis.path));
-    request.files.add(await http.MultipartFile.fromPath('fileCni', fileCni.path));
-    request.files.add(await http.MultipartFile.fromPath('fileVehicule', fileVehicule.path));
+    request.files
+        .add(await http.MultipartFile.fromPath('fileProfil', fileProfil.path));
+    request.files
+        .add(await http.MultipartFile.fromPath('filePermis', filePermis.path));
+    request.files
+        .add(await http.MultipartFile.fromPath('fileCni', fileCni.path));
+    request.files.add(
+        await http.MultipartFile.fromPath('fileVehicule', fileVehicule.path));
 
     final streamedResponse = await request.send();
     final response = await http.Response.fromStream(streamedResponse);

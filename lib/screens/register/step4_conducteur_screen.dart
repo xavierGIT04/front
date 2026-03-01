@@ -31,6 +31,9 @@ class _Step4ConducteurScreenState extends State<Step4ConducteurScreen> {
   final _picker = ImagePicker();
   bool _loading = false;
 
+  //  NOUVEAU : choix du type de véhicule (ZEM par défaut)
+  String _typeVehicule = 'ZEM';
+
   File? _fileProfil;
   File? _filePermis;
   File? _fileCni;
@@ -65,21 +68,28 @@ class _Step4ConducteurScreenState extends State<Step4ConducteurScreen> {
   Future<void> _inscrire() async {
     if (!_formKey.currentState!.validate()) return;
 
-    // Vérification des fichiers obligatoires
     if (_fileProfil == null) {
-      showSnack(context, 'La photo de profil est obligatoire', error: true);
+      showSnack(context, 'La photo de profil est obligatoire',
+          error: true);
       return;
     }
     if (_filePermis == null) {
-      showSnack(context, 'La photo du permis est obligatoire', error: true);
+      showSnack(context, 'La photo du permis est obligatoire',
+          error: true);
       return;
     }
     if (_fileCni == null) {
-      showSnack(context, "La photo de la CNI est obligatoire", error: true);
+      showSnack(context, "La photo de la CNI est obligatoire",
+          error: true);
       return;
     }
     if (_fileVehicule == null) {
-      showSnack(context, "La photo de l'engin est obligatoire", error: true);
+      showSnack(
+          context,
+          _typeVehicule == 'ZEM'
+              ? "La photo de la moto est obligatoire"
+              : "La photo du taxi est obligatoire",
+          error: true);
       return;
     }
 
@@ -92,23 +102,25 @@ class _Step4ConducteurScreenState extends State<Step4ConducteurScreen> {
         password: widget.password,
         immatriculation: _immaCtrl.text.trim(),
         numeroPermis: _permisCtrl.text.trim(),
+        typeVehicule: _typeVehicule, //  NOUVEAU
         fileProfil: _fileProfil!,
         filePermis: _filePermis!,
         fileCni: _fileCni!,
         fileVehicule: _fileVehicule!,
       );
       if (!mounted) return;
-      showSnack(
-          context, '🎉 Inscription réussie ! En attente de validation admin.');
+      showSnack(context,
+          ' Inscription réussie ! En attente de validation admin.');
       await Future.delayed(const Duration(seconds: 1));
       if (!mounted) return;
       Navigator.pushAndRemoveUntil(
         context,
         MaterialPageRoute(builder: (_) => const LoginScreen()),
-        (route) => false,
+            (route) => false,
       );
     } catch (e) {
-      showSnack(context, e.toString().replaceAll('Exception: ', ''), error: true);
+      showSnack(context, e.toString().replaceAll('Exception: ', ''),
+          error: true);
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -116,6 +128,8 @@ class _Step4ConducteurScreenState extends State<Step4ConducteurScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isZem = _typeVehicule == 'ZEM';
+
     return Scaffold(
       appBar: AppBar(
         leading: IconButton(
@@ -134,31 +148,38 @@ class _Step4ConducteurScreenState extends State<Step4ConducteurScreen> {
                 const StepIndicator(currentStep: 3, totalSteps: 4),
                 const SizedBox(height: 24),
 
-                // En-tête
+                // ── En-tête dynamique ──────────────────────────────
                 Row(
                   children: [
-                    Container(
+                    AnimatedContainer(
+                      duration: const Duration(milliseconds: 200),
                       padding: const EdgeInsets.all(10),
                       decoration: BoxDecoration(
                         color: AppColors.primary.withOpacity(0.12),
                         shape: BoxShape.circle,
                       ),
-                      child: const Icon(Icons.motorcycle_rounded,
-                          color: AppColors.primary, size: 28),
+                      child: Text(
+                        isZem ? '🏍️' : '🚕',
+                        style: const TextStyle(fontSize: 24),
+                      ),
                     ),
                     const SizedBox(width: 14),
-                    const Column(
+                    Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          'Conducteur Zém',
-                          style: TextStyle(
-                            fontSize: 22,
-                            fontWeight: FontWeight.w900,
-                            color: AppColors.textDark,
+                        AnimatedSwitcher(
+                          duration: const Duration(milliseconds: 200),
+                          child: Text(
+                            isZem ? 'Conducteur Zém' : 'Conducteur Taxi',
+                            key: ValueKey(_typeVehicule),
+                            style: const TextStyle(
+                              fontSize: 22,
+                              fontWeight: FontWeight.w900,
+                              color: AppColors.textDark,
+                            ),
                           ),
                         ),
-                        Text(
+                        const Text(
                           'Documents requis pour validation',
                           style: TextStyle(
                               color: AppColors.textMedium, fontSize: 13),
@@ -169,47 +190,75 @@ class _Step4ConducteurScreenState extends State<Step4ConducteurScreen> {
                 ),
                 const SizedBox(height: 24),
 
-                // Immatriculation
-                _sectionTitle('Plaque d\'immatriculation'),
+                // ✅ NOUVEAU — Choix type véhicule
+                const Text('Type de véhicule',
+                    style: TextStyle(
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textDark,
+                        fontSize: 14)),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    _VehiculeTypeCard(
+                      emoji: '🏍️',
+                      title: 'Zém',
+                      description: 'Moto-taxi',
+                      selected: _typeVehicule == 'ZEM',
+                      onTap: () => setState(() => _typeVehicule = 'ZEM'),
+                    ),
+                    const SizedBox(width: 12),
+                    _VehiculeTypeCard(
+                      emoji: '🚕',
+                      title: 'Taxi',
+                      description: 'Voiture',
+                      selected: _typeVehicule == 'TAXI',
+                      onTap: () => setState(() => _typeVehicule = 'TAXI'),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 24),
+
+                // ── Immatriculation ────────────────────────────────
+                _sectionTitle('Plaque d\'immatriculation '
+                    '${isZem ? 'de la moto' : 'du véhicule'}'),
                 const SizedBox(height: 8),
                 TextFormField(
                   controller: _immaCtrl,
                   textCapitalization: TextCapitalization.characters,
-                  decoration: const InputDecoration(
-                    hintText: 'Ex: TG 1234 AB',
-                    prefixIcon:
-                        Icon(Icons.confirmation_number_outlined, color: AppColors.textLight),
+                  decoration: InputDecoration(
+                    hintText: isZem ? 'Ex: TG 1234 AB' : 'Ex: TG 5678 CD',
+                    prefixIcon: const Icon(
+                        Icons.confirmation_number_outlined,
+                        color: AppColors.textLight),
                   ),
                   validator: (v) =>
-                      (v == null || v.isEmpty) ? 'Champ requis' : null,
+                  (v == null || v.isEmpty) ? 'Champ requis' : null,
                 ),
                 const SizedBox(height: 16),
 
-                // Numéro de permis
+                // ── Numéro de permis ───────────────────────────────
                 _sectionTitle('Numéro du permis de conduire'),
                 const SizedBox(height: 8),
                 TextFormField(
                   controller: _permisCtrl,
                   decoration: const InputDecoration(
                     hintText: 'Ex: TG-2020-00123',
-                    prefixIcon:
-                        Icon(Icons.card_membership_outlined, color: AppColors.textLight),
+                    prefixIcon: Icon(Icons.card_membership_outlined,
+                        color: AppColors.textLight),
                   ),
                   validator: (v) =>
-                      (v == null || v.isEmpty) ? 'Champ requis' : null,
+                  (v == null || v.isEmpty) ? 'Champ requis' : null,
                 ),
                 const SizedBox(height: 24),
 
-                // Documents photos
+                // ── Documents photos ───────────────────────────────
                 _sectionTitle('Photos & Documents'),
                 const SizedBox(height: 4),
-                const Text(
-                  'Toutes les photos sont obligatoires',
-                  style: TextStyle(fontSize: 12, color: AppColors.textLight),
-                ),
+                const Text('Toutes les photos sont obligatoires',
+                    style:
+                    TextStyle(fontSize: 12, color: AppColors.textLight)),
                 const SizedBox(height: 14),
 
-                // Grille 2x2
                 GridView.count(
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
@@ -240,8 +289,11 @@ class _Step4ConducteurScreenState extends State<Step4ConducteurScreen> {
                       onTap: () => _pickImage('cni'),
                     ),
                     _PhotoCard(
-                      label: 'Photo de l\'engin',
-                      icon: Icons.motorcycle_rounded,
+                      // ✅ Label dynamique selon type véhicule
+                      label: isZem ? 'Photo de la moto' : 'Photo du taxi',
+                      icon: isZem
+                          ? Icons.motorcycle_rounded
+                          : Icons.local_taxi_rounded,
                       file: _fileVehicule,
                       required: true,
                       onTap: () => _pickImage('vehicule'),
@@ -256,8 +308,8 @@ class _Step4ConducteurScreenState extends State<Step4ConducteurScreen> {
                   decoration: BoxDecoration(
                     color: AppColors.primary.withOpacity(0.08),
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                        color: AppColors.primary.withOpacity(0.3)),
+                    border:
+                    Border.all(color: AppColors.primary.withOpacity(0.3)),
                   ),
                   child: const Row(
                     children: [
@@ -294,10 +346,9 @@ class _Step4ConducteurScreenState extends State<Step4ConducteurScreen> {
     return Text(
       text,
       style: const TextStyle(
-        fontSize: 13,
-        fontWeight: FontWeight.w600,
-        color: AppColors.textDark,
-      ),
+          fontSize: 13,
+          fontWeight: FontWeight.w600,
+          color: AppColors.textDark),
     );
   }
 
@@ -309,7 +360,94 @@ class _Step4ConducteurScreenState extends State<Step4ConducteurScreen> {
   }
 }
 
-// ─── Card photo avec preview ─────────────────────────────────────────────
+// ─── Card sélection type véhicule ─────────────────────────────────────────
+
+class _VehiculeTypeCard extends StatelessWidget {
+  final String emoji;
+  final String title;
+  final String description;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _VehiculeTypeCard({
+    required this.emoji,
+    required this.title,
+    required this.description,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: GestureDetector(
+        onTap: onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          padding: const EdgeInsets.symmetric(vertical: 18),
+          decoration: BoxDecoration(
+            color: selected
+                ? AppColors.primary.withOpacity(0.1)
+                : Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: selected ? AppColors.primary : AppColors.border,
+              width: selected ? 2.5 : 1,
+            ),
+            boxShadow: selected
+                ? [
+              BoxShadow(
+                  color: AppColors.primary.withOpacity(0.2),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4))
+            ]
+                : [],
+          ),
+          child: Column(
+            children: [
+              Text(emoji, style: const TextStyle(fontSize: 36)),
+              const SizedBox(height: 8),
+              Text(
+                title,
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: selected ? AppColors.primary : AppColors.textDark,
+                ),
+              ),
+              Text(
+                description,
+                style: const TextStyle(
+                    fontSize: 12, color: AppColors.textMedium),
+              ),
+              if (selected) ...[
+                const SizedBox(height: 6),
+                Container(
+                  padding:
+                  const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Text(
+                    '✓ Sélectionné',
+                    style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Card photo ───────────────────────────────────────────────────────────
+
 class _PhotoCard extends StatelessWidget {
   final String label;
   final IconData icon;
@@ -340,48 +478,46 @@ class _PhotoCard extends StatelessWidget {
         ),
         child: file != null
             ? ClipRRect(
-                borderRadius: BorderRadius.circular(13),
-                child: Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    Image.file(file!, fit: BoxFit.cover),
-                    Positioned(
-                      bottom: 6,
-                      right: 6,
-                      child: Container(
-                        padding: const EdgeInsets.all(4),
-                        decoration: const BoxDecoration(
-                          color: AppColors.primary,
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(Icons.check,
-                            size: 14, color: Colors.black87),
-                      ),
-                    ),
-                  ],
+          borderRadius: BorderRadius.circular(13),
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              Image.file(file!, fit: BoxFit.cover),
+              Positioned(
+                bottom: 6,
+                right: 6,
+                child: Container(
+                  padding: const EdgeInsets.all(4),
+                  decoration: const BoxDecoration(
+                      color: AppColors.primary,
+                      shape: BoxShape.circle),
+                  child: const Icon(Icons.check,
+                      size: 14, color: Colors.white),
                 ),
-              )
-            : Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(icon, size: 28, color: AppColors.textLight),
-                  const SizedBox(height: 6),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 8),
-                    child: Text(
-                      label,
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(
-                        fontSize: 11,
-                        color: AppColors.textMedium,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ),
-                  const Icon(Icons.add_circle_outline,
-                      size: 18, color: AppColors.primary),
-                ],
               ),
+            ],
+          ),
+        )
+            : Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, size: 28, color: AppColors.textLight),
+            const SizedBox(height: 6),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              child: Text(
+                label,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                    fontSize: 11,
+                    color: AppColors.textMedium,
+                    fontWeight: FontWeight.w500),
+              ),
+            ),
+            const Icon(Icons.add_circle_outline,
+                size: 18, color: AppColors.primary),
+          ],
+        ),
       ),
     );
   }

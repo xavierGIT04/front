@@ -28,24 +28,33 @@ class CourseApiService {
   }
 
   static Future<CourseModel> commanderCourse({
-    required double departLat, required double departLng,
+    required double departLat,
+    required double departLng,
     required String departAdresse,
-    required double destLat, required double destLng,
+    required double destLat,
+    required double destLng,
     required String destAdresse,
     required String modePaiement,
+    String typeVehicule = 'ZEM', //  NOUVEAU — défaut ZEM
   }) async {
     final uri = Uri.parse('${ApiService.baseUrl}/courses/commander');
-    final response = await http.post(uri,
+    final response = await http.post(
+      uri,
       headers: await _authHeaders(),
       body: jsonEncode({
-        'depart_lat': departLat, 'depart_lng': departLng,
+        'depart_lat': departLat,
+        'depart_lng': departLng,
         'depart_adresse': departAdresse,
-        'destination_lat': destLat, 'destination_lng': destLng,
+        'destination_lat': destLat,
+        'destination_lng': destLng,
         'destination_adresse': destAdresse,
         'mode_paiement': modePaiement,
+        'type_vehicule': typeVehicule, //  NOUVEAU
       }),
     );
-    if (response.statusCode == 200) return CourseModel.fromJson(jsonDecode(response.body));
+    if (response.statusCode == 200) {
+      return CourseModel.fromJson(jsonDecode(response.body));
+    }
     final body = jsonDecode(response.body);
     throw Exception(body['message'] ?? 'Erreur commande');
   }
