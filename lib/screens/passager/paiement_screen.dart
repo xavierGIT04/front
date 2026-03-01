@@ -41,7 +41,7 @@ class _PaiementScreenState extends State<PaiementScreen> {
         (r) => false,
       );
     } catch (e) {
-      if (mounted) showSnack(context, 'Paiement confirmé ✅', error: false);
+      if (mounted) showSnack(context, 'Paiement confirmé ', error: false);
       await Future.delayed(const Duration(seconds: 1));
       if (!mounted) return;
       Navigator.pushAndRemoveUntil(

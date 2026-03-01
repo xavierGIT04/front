@@ -8,18 +8,19 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-    
 
   # HTTP
   http: ^1.2.0
-  # ✅ CORRECTION : http_parser utilisé dans api_service.dart mais non déclaré
   http_parser: ^4.0.0
 
   # Stockage local
   shared_preferences: ^2.2.2
 
-  # Sélection d'images (KYC conducteur)
+  # Sélection d'images
   image_picker: ^1.0.7
+
+  # Formatage des dates (utilisé dans notifications_screen.dart)
+  intl: ^0.19.0
 
   # UI
   cupertino_icons: ^1.0.6

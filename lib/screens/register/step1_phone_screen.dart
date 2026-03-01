@@ -162,7 +162,7 @@ class _Step1PhoneScreenState extends State<Step1PhoneScreen> {
                     ),
                   ),
 
-                  const SizedBox(height: 100),
+                  const SizedBox(height: 90),
                   PrimaryButton(
                     label: 'Recevoir le code',
                     onPressed: _requestOtp,

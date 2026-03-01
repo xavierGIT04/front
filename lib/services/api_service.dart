@@ -6,7 +6,7 @@ import 'package:http_parser/http_parser.dart';
 class ApiService {
   // ✅ CORRECTION : URL selon l'environnement
   // 🟢 Émulateur Android → 10.0.2.2 pointe vers localhost du PC
-  static const String baseUrl = 'http://10.0.2.2:8081/api/v1';
+  static const String baseUrl = 'http://192.168.1.75:8081/api/v1';
 
   // 🟢 Simulateur iOS
   // static const String baseUrl = 'http://localhost:8081/api/v1';
