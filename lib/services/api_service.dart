@@ -9,11 +9,11 @@ class ApiService {
   //static const String baseUrl = 'http://10.0.2.2:8081/api/v1';
 
   //  Simulateur iOS
-  // static const String baseUrl = 'http://localhost:8081/api/v1';
+   static const String baseUrl = 'http://localhost:8081/api/v1';
 
   //  Appareil physique → remplace par ton IP locale
   // Trouver ton IP : ipconfig (Windows) → cherche "Adresse IPv4"
-  static const String baseUrl = 'http://localhost:8081/api/v1';
+  //static const String baseUrl = 'http://192.168.1.71:8081/api/v1';
 
   // ─── OTP ──────────────────────────────────────────────────────────────────
 

@@ -8,12 +8,14 @@ class ConducteurMapView extends StatefulWidget {
   final double lat;
   final double lng;
   final bool enLigne;
+  final String? typeVehicule; // 'ZEM' ou 'TAXI'
 
   const ConducteurMapView({
     super.key,
     required this.lat,
     required this.lng,
     required this.enLigne,
+    this.typeVehicule,
   });
 
   @override
@@ -26,12 +28,23 @@ class _ConducteurMapViewState extends State<ConducteurMapView> {
   @override
   void didUpdateWidget(ConducteurMapView old) {
     super.didUpdateWidget(old);
-    // Recentre si la position a changé
     if (old.lat != widget.lat || old.lng != widget.lng) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _mapController.move(LatLng(widget.lat, widget.lng), 15.0);
       });
     }
+  }
+
+  IconData get _vehiculeIcon {
+    if (widget.typeVehicule == 'TAXI')
+      return Icons.local_taxi_rounded;
+    return Icons.motorcycle_rounded; // ZEM par défaut
+  }
+
+  Color get _vehiculeColor {
+    if (!widget.enLigne) return AppColors.textMedium;
+    if (widget.typeVehicule == 'TAXI') return const Color(0xFF2196F3);
+    return AppColors.primary; // ZEM = orange
   }
 
   @override
@@ -48,8 +61,7 @@ class _ConducteurMapViewState extends State<ConducteurMapView> {
           ),
           children: [
             TileLayer(
-              urlTemplate:
-              'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+              urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
               userAgentPackageName: 'com.tp.tripapp',
               maxZoom: 19,
             ),
@@ -61,32 +73,23 @@ class _ConducteurMapViewState extends State<ConducteurMapView> {
                   height: 56,
                   child: Container(
                     decoration: BoxDecoration(
-                      color: widget.enLigne
-                          ? AppColors.primary
-                          : AppColors.textMedium,
+                      color: _vehiculeColor,
                       shape: BoxShape.circle,
-                      border:
-                      Border.all(color: Colors.white, width: 3),
+                      border: Border.all(color: Colors.white, width: 3),
                       boxShadow: [
                         BoxShadow(
-                            color: (widget.enLigne
-                                ? AppColors.primary
-                                : AppColors.textMedium)
-                                .withOpacity(0.4),
-                            blurRadius: 14,
-                            spreadRadius: 2)
+                          color: _vehiculeColor.withOpacity(0.4),
+                          blurRadius: 14,
+                          spreadRadius: 2,
+                        ),
                       ],
                     ),
-                    child: const Icon(Icons.motorcycle_rounded,
-                        color: Colors.white, size: 26),
+                    child: Icon(_vehiculeIcon, color: Colors.white, size: 26),
                   ),
                 ),
               ],
             ),
-            const SimpleAttributionWidget(
-              source: Text('© OpenStreetMap',
-                  style: TextStyle(fontSize: 10)),
-            ),
+
           ],
         ),
 
@@ -104,8 +107,9 @@ class _ConducteurMapViewState extends State<ConducteurMapView> {
                 borderRadius: BorderRadius.circular(12),
                 boxShadow: [
                   BoxShadow(
-                      color: Colors.black.withOpacity(0.12),
-                      blurRadius: 8)
+                    color: Colors.black.withOpacity(0.12),
+                    blurRadius: 8,
+                  ),
                 ],
               ),
               child: const Icon(Icons.my_location_rounded,
@@ -114,41 +118,86 @@ class _ConducteurMapViewState extends State<ConducteurMapView> {
           ),
         ),
 
-        // Badge statut en ligne / hors ligne
+        // Badge statut EN LIGNE / HORS LIGNE
         Positioned(
           top: 12,
           left: 12,
-          child: Container(
-            padding:
-            const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            decoration: BoxDecoration(
-              color: widget.enLigne ? AppColors.success : Colors.grey,
-              borderRadius: BorderRadius.circular(20),
-              boxShadow: [
-                BoxShadow(
-                    color: Colors.black.withOpacity(0.15),
-                    blurRadius: 6)
-              ],
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                padding:
+                const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: widget.enLigne ? AppColors.success : Colors.grey,
+                  borderRadius: BorderRadius.circular(20),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.15),
+                      blurRadius: 6,
+                    ),
+                  ],
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 8,
+                      height: 8,
+                      decoration: const BoxDecoration(
+                        color: Colors.white,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      widget.enLigne ? 'EN LIGNE' : 'HORS LIGNE',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              // Badge type de véhicule
+              if (widget.typeVehicule != null) ...[
+                const SizedBox(height: 6),
                 Container(
-                  width: 8,
-                  height: 8,
-                  decoration: const BoxDecoration(
-                      color: Colors.white, shape: BoxShape.circle),
-                ),
-                const SizedBox(width: 6),
-                Text(
-                  widget.enLigne ? 'EN LIGNE' : 'HORS LIGNE',
-                  style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 11,
-                      fontWeight: FontWeight.bold),
+                  padding:
+                  const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: widget.typeVehicule == 'TAXI'
+                        ? const Color(0xFF2196F3)
+                        : AppColors.primary,
+                    borderRadius: BorderRadius.circular(20),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.15),
+                        blurRadius: 6,
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(_vehiculeIcon, color: Colors.white, size: 13),
+                      const SizedBox(width: 6),
+                      Text(
+                        widget.typeVehicule == 'TAXI' ? 'TAXI' : 'ZÉM',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ],
-            ),
+            ],
           ),
         ),
       ],

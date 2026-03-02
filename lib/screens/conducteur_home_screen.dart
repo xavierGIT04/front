@@ -8,10 +8,11 @@ import '../models/course_model.dart';
 import '../utils/app_theme.dart';
 import '../utils/widgets.dart';
 import 'login_screen.dart';
-import 'conducteur/conducteur_map_view.dart';          // ← AJOUT
+import 'conducteur/conducteur_map_view.dart';
 import 'conducteur/suivi_course_conducteur_screen.dart';
 import 'notifications/notifications_screen.dart';
 import 'profile/profile_screen.dart';
+import '../services/location_service.dart';
 
 class ConducteurHomeScreen extends StatefulWidget {
   const ConducteurHomeScreen({super.key});
@@ -39,6 +40,11 @@ class _ConducteurHomeScreenState extends State<ConducteurHomeScreen> {
   double _lat = 6.1375;
   double _lng = 1.2123;
 
+  // ── Validation & type véhicule ───────────────────────────────────────────
+  bool _estValide = true;
+  bool _loadingValidation = false;
+  String? _typeVehicule; // 'ZEM' ou 'TAXI'
+
   @override
   void initState() {
     super.initState();
@@ -46,8 +52,9 @@ class _ConducteurHomeScreenState extends State<ConducteurHomeScreen> {
     _loadBadge();
     _checkCourseActive();
     _loadStats();
-    Timer.periodic(
-        const Duration(seconds: 30), (_) => _loadBadge());
+    _loadTypeVehicule();
+    _loadStatutValidation();
+    Timer.periodic(const Duration(seconds: 30), (_) => _loadBadge());
   }
 
   @override
@@ -55,6 +62,36 @@ class _ConducteurHomeScreenState extends State<ConducteurHomeScreen> {
     _pollingTimer?.cancel();
     _gpsTimer?.cancel();
     super.dispose();
+  }
+
+  /// Charge le type de véhicule depuis le stockage local
+  Future<void> _loadTypeVehicule() async {
+    final type = await AuthStorage.getTypeVehicule();
+    if (mounted && type != null) {
+      setState(() => _typeVehicule = type);
+    }
+  }
+
+  /// Vérifie si le compte conducteur est validé par le régulateur
+  Future<void> _loadStatutValidation() async {
+    setState(() => _loadingValidation = true);
+    try {
+      await CourseApiService.checkValidationConducteur();
+      if (mounted) setState(() => _estValide = true);
+    } catch (e) {
+      final msg = e.toString().toLowerCase();
+      if (msg.contains('validé') ||
+          msg.contains('valide') ||
+          msg.contains('régulateur') ||
+          msg.contains('regulateur') ||
+          msg.contains('admin')) {
+        if (mounted) setState(() => _estValide = false);
+      } else {
+        if (mounted) setState(() => _estValide = true);
+      }
+    } finally {
+      if (mounted) setState(() => _loadingValidation = false);
+    }
   }
 
   Future<void> _loadPrenom() async {
@@ -88,12 +125,21 @@ class _ConducteurHomeScreenState extends State<ConducteurHomeScreen> {
   }
 
   void _toggleEnLigne() async {
+    // Bloquer si compte non validé
+    if (!_estValide) {
+      showSnack(
+        context,
+        'Votre compte n\'est pas encore validé par le régulateur.',
+        error: true,
+      );
+      return;
+    }
+
     setState(() => _enLigne = !_enLigne);
     if (_enLigne) {
       await _updateGPS();
       _pollingTimer = Timer.periodic(
-          const Duration(seconds: 5),
-              (_) => _loadCoursesProches());
+          const Duration(seconds: 5), (_) => _loadCoursesProches());
       _gpsTimer = Timer.periodic(
           const Duration(seconds: 10), (_) => _updateGPS());
       _loadCoursesProches();
@@ -102,18 +148,19 @@ class _ConducteurHomeScreenState extends State<ConducteurHomeScreen> {
       _pollingTimer?.cancel();
       _gpsTimer?.cancel();
       setState(() => _coursesProches = []);
-      if (mounted)
-        showSnack(context, 'Vous êtes maintenant HORS LIGNE');
+      if (mounted) showSnack(context, 'Vous êtes maintenant HORS LIGNE');
     }
   }
 
   Future<void> _updateGPS() async {
     try {
-      final random = DateTime.now().millisecondsSinceEpoch % 100;
-      _lat = 6.1375 + (random - 50) * 0.0001;
-      _lng = 1.2123 + ((random + 25) % 100 - 50) * 0.0001;
+      // Utiliser la vraie position GPS
+      final pos = await LocationService.getCurrentPosition();
+      _lat = pos.latitude;
+      _lng = pos.longitude;
       await CourseApiService.updateLocalisation(_lat, _lng);
       if (mounted) setState(() {}); // rafraîchit la carte
+      debugPrint('GPS mis à jour : lat=$_lat lng=$_lng');
     } catch (e) {
       debugPrint('Erreur GPS: $e');
     }
@@ -127,8 +174,8 @@ class _ConducteurHomeScreenState extends State<ConducteurHomeScreen> {
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
-              builder: (_) => SuiviCourseConducteurScreen(
-                  course: courseActive)),
+              builder: (_) =>
+                  SuiviCourseConducteurScreen(course: courseActive)),
         );
       }
     } catch (_) {}
@@ -173,8 +220,7 @@ class _ConducteurHomeScreenState extends State<ConducteurHomeScreen> {
         _loadStats();
         if (_enLigne) {
           _pollingTimer = Timer.periodic(
-              const Duration(seconds: 5),
-                  (_) => _loadCoursesProches());
+              const Duration(seconds: 5), (_) => _loadCoursesProches());
           _gpsTimer = Timer.periodic(
               const Duration(seconds: 10), (_) => _updateGPS());
           _loadCoursesProches();
@@ -182,8 +228,7 @@ class _ConducteurHomeScreenState extends State<ConducteurHomeScreen> {
       });
     } catch (e) {
       if (mounted)
-        showSnack(context,
-            e.toString().replaceAll('Exception: ', ''),
+        showSnack(context, e.toString().replaceAll('Exception: ', ''),
             error: true);
     }
   }
@@ -207,7 +252,7 @@ class _ConducteurHomeScreenState extends State<ConducteurHomeScreen> {
       body: SafeArea(
         child: Column(
           children: [
-            // ─── Top bar ─────────────────────────────────────────────
+            // ─── Top bar ──────────────────────────────────────────────
             Padding(
               padding: const EdgeInsets.symmetric(
                   horizontal: 16, vertical: 12),
@@ -232,7 +277,6 @@ class _ConducteurHomeScreenState extends State<ConducteurHomeScreen> {
                     ),
                   ),
                   const Spacer(),
-                  // Toggle EN LIGNE / HORS LIGNE
                   GestureDetector(
                     onTap: _toggleEnLigne,
                     child: Container(
@@ -255,7 +299,9 @@ class _ConducteurHomeScreenState extends State<ConducteurHomeScreen> {
                             style: TextStyle(
                               fontWeight: FontWeight.bold,
                               fontSize: 12,
-                              color: _enLigne
+                              color: !_estValide
+                                  ? AppColors.textLight
+                                  : _enLigne
                                   ? AppColors.success
                                   : AppColors.textMedium,
                             ),
@@ -266,7 +312,9 @@ class _ConducteurHomeScreenState extends State<ConducteurHomeScreen> {
                             width: 44,
                             height: 24,
                             decoration: BoxDecoration(
-                              color: _enLigne
+                              color: !_estValide
+                                  ? AppColors.textLight
+                                  : _enLigne
                                   ? AppColors.success
                                   : AppColors.textLight,
                               borderRadius: BorderRadius.circular(12),
@@ -292,7 +340,6 @@ class _ConducteurHomeScreenState extends State<ConducteurHomeScreen> {
                     ),
                   ),
                   const Spacer(),
-                  // Cloche notifications
                   Container(
                     width: 44,
                     height: 44,
@@ -326,9 +373,7 @@ class _ConducteurHomeScreenState extends State<ConducteurHomeScreen> {
                               constraints: const BoxConstraints(
                                   minWidth: 16, minHeight: 16),
                               child: Text(
-                                _badgeCount > 9
-                                    ? '9+'
-                                    : '$_badgeCount',
+                                _badgeCount > 9 ? '9+' : '$_badgeCount',
                                 style: const TextStyle(
                                     color: Colors.white,
                                     fontSize: 9,
@@ -344,7 +389,7 @@ class _ConducteurHomeScreenState extends State<ConducteurHomeScreen> {
               ),
             ),
 
-            // ─── Gains du jour ────────────────────────────────────────
+            // ─── Gains du jour ─────────────────────────────────────────
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: Center(
@@ -397,19 +442,27 @@ class _ConducteurHomeScreenState extends State<ConducteurHomeScreen> {
             ),
             const SizedBox(height: 12),
 
-            // ─── Contenu principal ────────────────────────────────────
+            // ─── Contenu principal ─────────────────────────────────────
             Expanded(
               child: _currentTab == 2
                   ? _HistoriqueConducteur(stats: _stats)
-                  : ConducteurMapView(        // ← REMPLACEMENT du placeholder
+                  : _loadingValidation
+                  ? const Center(
+                child: CircularProgressIndicator(
+                    color: AppColors.primary),
+              )
+                  : !_estValide
+                  ? const _ValidationEnAttenteWidget()
+                  : ConducteurMapView(
                 lat: _lat,
                 lng: _lng,
                 enLigne: _enLigne,
+                typeVehicule: _typeVehicule,
               ),
             ),
 
-            // ─── Panel demandes proches ───────────────────────────────
-            if (_currentTab != 2)
+            // ─── Panel demandes proches (uniquement si validé) ─────────
+            if (_currentTab != 2 && _estValide && !_loadingValidation)
               Container(
                 padding: const EdgeInsets.all(20),
                 decoration: const BoxDecoration(
@@ -493,7 +546,7 @@ class _ConducteurHomeScreenState extends State<ConducteurHomeScreen> {
                 ),
               ),
 
-            // ─── Bottom navigation ────────────────────────────────────
+            // ─── Bottom navigation ─────────────────────────────────────
             Container(
               padding: const EdgeInsets.symmetric(
                   horizontal: 16, vertical: 10),
@@ -542,7 +595,166 @@ class _ConducteurHomeScreenState extends State<ConducteurHomeScreen> {
   }
 }
 
-// ─── Historique conducteur ────────────────────────────────────────────────
+// ─── Widget écran d'attente de validation ─────────────────────────────────────
+
+class _ValidationEnAttenteWidget extends StatelessWidget {
+  const _ValidationEnAttenteWidget();
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 24),
+      child: Column(
+        children: [
+          const SizedBox(height: 20),
+          TweenAnimationBuilder<double>(
+            tween: Tween(begin: 0.8, end: 1.0),
+            duration: const Duration(seconds: 1),
+            curve: Curves.elasticOut,
+            builder: (_, value, child) =>
+                Transform.scale(scale: value, child: child),
+            child: Container(
+              width: 110,
+              height: 110,
+              decoration: BoxDecoration(
+                color: AppColors.primary.withOpacity(0.12),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.hourglass_top_rounded,
+                size: 55,
+                color: AppColors.primary,
+              ),
+            ),
+          ),
+          const SizedBox(height: 28),
+          const Text(
+            'Compte en attente\nde validation',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.w900,
+              color: AppColors.textDark,
+              height: 1.3,
+            ),
+          ),
+          const SizedBox(height: 14),
+          const Text(
+            'Vos documents ont bien été reçus. Un régulateur '
+                'va vérifier vos informations et activer votre compte '
+                'dans les plus brefs délais.',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 14,
+              color: AppColors.textMedium,
+              height: 1.6,
+            ),
+          ),
+          const SizedBox(height: 32),
+          _EtapeRow(
+            numero: '1',
+            titre: 'Documents soumis',
+            description: 'Permis, CNI et photo de l\'engin',
+            done: true,
+          ),
+          const SizedBox(height: 10),
+          _EtapeRow(
+            numero: '2',
+            titre: 'Vérification en cours',
+            description: 'Un régulateur examine vos documents',
+            done: false,
+          ),
+          const SizedBox(height: 10),
+          _EtapeRow(
+            numero: '3',
+            titre: 'Activation du compte',
+            description: 'Vous recevrez une confirmation',
+            done: false,
+          ),
+          const SizedBox(height: 20),
+        ],
+      ),
+    );
+  }
+}
+
+class _EtapeRow extends StatelessWidget {
+  final String numero;
+  final String titre;
+  final String description;
+  final bool done;
+
+  const _EtapeRow({
+    required this.numero,
+    required this.titre,
+    required this.description,
+    required this.done,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: done ? AppColors.success : AppColors.border,
+          width: done ? 1.5 : 1,
+        ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: done
+                  ? AppColors.success.withOpacity(0.12)
+                  : AppColors.primary.withOpacity(0.10),
+              shape: BoxShape.circle,
+            ),
+            child: done
+                ? const Icon(Icons.check_rounded,
+                color: AppColors.success, size: 20)
+                : Center(
+              child: Text(
+                numero,
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.primary,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  titre,
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 13,
+                    color: done ? AppColors.success : AppColors.textDark,
+                  ),
+                ),
+                Text(
+                  description,
+                  style: const TextStyle(
+                      fontSize: 12, color: AppColors.textMedium),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─── Historique conducteur ────────────────────────────────────────────────────
 
 class _HistoriqueConducteur extends StatelessWidget {
   final Map<String, dynamic>? stats;
@@ -563,8 +775,8 @@ class _HistoriqueConducteur extends StatelessWidget {
             Icon(Icons.history_rounded, size: 64, color: AppColors.border),
             SizedBox(height: 12),
             Text('Aucune course pour le moment',
-                style: TextStyle(
-                    color: AppColors.textMedium, fontSize: 15)),
+                style:
+                TextStyle(color: AppColors.textMedium, fontSize: 15)),
           ],
         ),
       );
@@ -586,8 +798,8 @@ class _HistoriqueConducteur extends StatelessWidget {
           child: Row(
             children: [
               Container(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 8, vertical: 4),
+                padding:
+                const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
                   color: (statut == 'TERMINEE'
                       ? AppColors.success
@@ -619,8 +831,7 @@ class _HistoriqueConducteur extends StatelessWidget {
               Text(
                 '${c['prix_final'] != null ? (c['prix_final'] as num).toInt() : (c['prix_estime'] != null ? (c['prix_estime'] as num).toInt() : 0)} F',
                 style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.textDark),
+                    fontWeight: FontWeight.bold, color: AppColors.textDark),
               ),
             ],
           ),
@@ -630,7 +841,7 @@ class _HistoriqueConducteur extends StatelessWidget {
   }
 }
 
-// ─── Widgets internes ─────────────────────────────────────────────────────
+// ─── Widgets internes ─────────────────────────────────────────────────────────
 
 class _CourseCard extends StatelessWidget {
   final CourseModel course;
@@ -677,8 +888,7 @@ class _CourseCard extends StatelessWidget {
                         Text(
                             '${course.distanceKm?.toStringAsFixed(1) ?? "?"} km',
                             style: const TextStyle(
-                                color: AppColors.textMedium,
-                                fontSize: 12)),
+                                color: AppColors.textMedium, fontSize: 12)),
                       ],
                     ),
                   ],
@@ -694,8 +904,7 @@ class _CourseCard extends StatelessWidget {
                           color: AppColors.textDark)),
                   Text(course.modePaiement ?? 'ESPÈCES',
                       style: const TextStyle(
-                          fontSize: 10,
-                          color: AppColors.textMedium)),
+                          fontSize: 10, color: AppColors.textMedium)),
                 ],
               ),
             ],
@@ -708,16 +917,14 @@ class _CourseCard extends StatelessWidget {
                     width: 10,
                     height: 10,
                     decoration: const BoxDecoration(
-                        color: AppColors.success,
-                        shape: BoxShape.circle)),
+                        color: AppColors.success, shape: BoxShape.circle)),
                 Container(
                     width: 2, height: 20, color: AppColors.border),
                 Container(
                     width: 10,
                     height: 10,
                     decoration: const BoxDecoration(
-                        color: AppColors.primary,
-                        shape: BoxShape.circle)),
+                        color: AppColors.primary, shape: BoxShape.circle)),
               ]),
               const SizedBox(width: 12),
               Expanded(
@@ -726,15 +933,13 @@ class _CourseCard extends StatelessWidget {
                   children: [
                     Text(course.departAdresse ?? 'Départ',
                         style: const TextStyle(
-                            fontSize: 13,
-                            color: AppColors.textDark),
+                            fontSize: 13, color: AppColors.textDark),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis),
                     const SizedBox(height: 12),
                     Text(course.destinationAdresse ?? 'Destination',
                         style: const TextStyle(
-                            fontSize: 13,
-                            color: AppColors.textDark),
+                            fontSize: 13, color: AppColors.textDark),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis),
                   ],

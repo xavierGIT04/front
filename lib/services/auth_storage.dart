@@ -7,31 +7,26 @@ class AuthStorage {
   static const _keyRoles = 'roles';
   static const _keyUserId = 'user_id';
   static const _keyUsername = 'username';
+  static const _keyTypeVehicule = 'type_vehicule';
 
   /// Sauvegarde la session après connexion.
-  ///
-  /// Le backend Spring Security renvoie les rôles sous deux formats possibles :
-  /// Format 1 (liste d'objets) : [{"authority": "ROLE_CONDUCTEUR"}]
-  /// Format 2 (liste de strings) : ["ROLE_CONDUCTEUR"]
-  /// Cette méthode gère les deux cas.
   static Future<void> saveSession(Map<String, dynamic> data) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_keyAccessToken, data['access_token'] ?? '');
     await prefs.setString(_keyRefreshToken, data['refresh_token'] ?? '');
     await prefs.setString(_keyUserId, (data['id'] ?? '').toString());
     await prefs.setString(_keyUsername, data['username'] ?? '');
+    await prefs.setString(_keyTypeVehicule, data['type_vehicule'] ?? '');
 
-    // ✅ CORRECTION : gestion des deux formats de rôles Spring Security
+    // Gestion des deux formats de rôles Spring Security
     final rawRoles = data['roles'];
     List<String> roles = [];
 
     if (rawRoles is List) {
       for (final r in rawRoles) {
         if (r is String) {
-          // Format 2 : liste de strings directes
           roles.add(r);
         } else if (r is Map<String, dynamic>) {
-          // Format 1 : liste d'objets {"authority": "ROLE_XXX"}
           final authority = r['authority'] as String?;
           if (authority != null) roles.add(authority);
         }
@@ -66,5 +61,18 @@ class AuthStorage {
   static Future<void> clearSession() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.clear();
+  }
+
+  /// Sauvegarde le type de véhicule du conducteur (ZEM ou TAXI)
+  static Future<void> saveTypeVehicule(String? type) async {
+    if (type == null) return;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_keyTypeVehicule, type);
+  }
+
+  /// Récupère le type de véhicule du conducteur
+  static Future<String?> getTypeVehicule() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString(_keyTypeVehicule);
   }
 }

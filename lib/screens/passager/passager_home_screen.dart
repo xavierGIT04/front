@@ -65,9 +65,7 @@ class _PassagerHomeScreenState extends State<PassagerHomeScreen> {
           _lng = pos.longitude;
           _positionChargee = true;
         });
-        // Met à jour la position sur le backend (pour que le passager
-        // soit localisé correctement pour la recherche de conducteurs)
-        CourseApiService.updateLocalisation(_lat, _lng).catchError((_) {});
+
       }
     } catch (e) {
       debugPrint('GPS error: $e');

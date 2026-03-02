@@ -35,7 +35,7 @@ class CourseApiService {
     required double destLng,
     required String destAdresse,
     required String modePaiement,
-    String typeVehicule = 'ZEM', //  NOUVEAU — défaut ZEM
+    String typeVehicule = 'ZEM',
   }) async {
     final uri = Uri.parse('${ApiService.baseUrl}/courses/commander');
     final response = await http.post(
@@ -49,7 +49,7 @@ class CourseApiService {
         'destination_lng': destLng,
         'destination_adresse': destAdresse,
         'mode_paiement': modePaiement,
-        'type_vehicule': typeVehicule, //  NOUVEAU
+        'type_vehicule': typeVehicule,
       }),
     );
     if (response.statusCode == 200) {
@@ -129,6 +129,25 @@ class CourseApiService {
       return (jsonDecode(response.body) as List).map((j) => CourseModel.fromJson(j)).toList();
     }
     return [];
+  }
+
+  /// Vérifie si le conducteur est validé par le régulateur.
+  /// Lance une Exception avec le message du backend si non validé.
+  static Future<void> checkValidationConducteur() async {
+    final uri = Uri.parse('${ApiService.baseUrl}/courses/proches');
+    final response = await http.get(uri, headers: await _authHeaders());
+    if (response.statusCode == 200) return; // validé, tout va bien
+    if (response.statusCode == 400 ||
+        response.statusCode == 403 ||
+        response.statusCode == 500) {
+      try {
+        final body = jsonDecode(response.body);
+        throw Exception(body['message'] ?? 'Compte non validé');
+      } catch (e) {
+        if (e is Exception) rethrow;
+        throw Exception('Compte non validé par le régulateur');
+      }
+    }
   }
 
   static Future<CourseModel> accepterCourse(int id) async {
