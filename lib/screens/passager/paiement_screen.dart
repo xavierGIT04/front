@@ -3,8 +3,10 @@ import '../../models/course_model.dart';
 import '../../services/course_api_service.dart';
 import '../../utils/app_theme.dart';
 import '../../utils/widgets.dart';
-import 'passager_home_screen.dart';
+import 'notation_screen.dart';
 
+///  Écran de paiement mobile (TMONEY ou MOOV_MONEY uniquement)
+/// Interface simplifiée : 4 chiffres + confirmation
 class PaiementScreen extends StatefulWidget {
   final CourseModel course;
   const PaiementScreen({super.key, required this.course});
@@ -16,7 +18,13 @@ class PaiementScreen extends StatefulWidget {
 class _PaiementScreenState extends State<PaiementScreen> {
   late CourseModel _course;
   bool _loading = false;
-  int _note = 5;
+
+  //  Contrôleurs pour les 4 chiffres
+  final List<TextEditingController> _pinCtrls = List.generate(
+    4,
+        (_) => TextEditingController(),
+  );
+  final List<FocusNode> _pinNodes = List.generate(4, (_) => FocusNode());
 
   @override
   void initState() {
@@ -24,47 +32,84 @@ class _PaiementScreenState extends State<PaiementScreen> {
     _course = widget.course;
   }
 
+  @override
+  void dispose() {
+    for (final ctrl in _pinCtrls) {
+      ctrl.dispose();
+    }
+    for (final node in _pinNodes) {
+      node.dispose();
+    }
+    super.dispose();
+  }
+
+  String get _pin => _pinCtrls.map((c) => c.text).join();
+
+  void _onPinChanged(int index, String value) {
+    // On ajoute setState ici pour que le bouton "CONFIRMER"
+    // vérifie la condition _pin.length == 4 à chaque frappe.
+    setState(() {});
+
+    if (value.isNotEmpty && index < 3) {
+      _pinNodes[index + 1].requestFocus();
+    } else if (value.isEmpty && index > 0) {
+      _pinNodes[index - 1].requestFocus();
+    }
+  }
+
   Future<void> _payer() async {
+    if (_pin.length < 4) {
+      showSnack(context, 'Entrez votre code PIN (4 chiffres)', error: true);
+      return;
+    }
+
     setState(() => _loading = true);
     try {
       await CourseApiService.payer(
         courseId: _course.id,
-        modePaiement: _course.modePaiement ?? 'ESPECES',
-        codePin: '0000',
+        modePaiement: _course.modePaiement ?? 'TMONEY',
+        codePin: _pin,
       );
-      // Après paiement → noter le conducteur
-      await CourseApiService.noter(courseId: _course.id, note: _note);
+
       if (!mounted) return;
-      Navigator.pushAndRemoveUntil(
+
+      //  Redirection vers notation
+      Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (_) => const PassagerHomeScreen()),
-            (r) => false,
+        MaterialPageRoute(
+          builder: (_) => NotationScreen(course: _course),
+        ),
       );
     } catch (e) {
-      if (mounted) showSnack(context, 'Paiement confirmé ', error: false);
-      await Future.delayed(const Duration(seconds: 1));
-      if (!mounted) return;
-      Navigator.pushAndRemoveUntil(
-        context,
-        MaterialPageRoute(builder: (_) => const PassagerHomeScreen()),
-            (r) => false,
-      );
+      if (mounted) {
+        showSnack(
+          context,
+          e.toString().replaceAll('Exception: ', ''),
+          error: true,
+        );
+      }
     } finally {
       if (mounted) setState(() => _loading = false);
     }
   }
 
-  /// Retourne le label et l'icône selon le mode de paiement
-  String _modePaiementLabel() {
-    switch (_course.modePaiement) {
-      case 'TMONEY':
-        return ' T-Money';
-      case 'MOOV_MONEY':
-        return ' Moov Money';
-      case 'ESPECES':
-      default:
-        return '💵 Espèces';
+  String get _operateur {
+    if (_course.modePaiement == 'MOOV_MONEY') return 'Moov Money';
+    return 'T-Money';
+  }
+
+  IconData get _operateurIcon {
+    if (_course.modePaiement == 'MOOV_MONEY') {
+      return Icons.account_balance_wallet_rounded;
     }
+    return Icons.phone_android_rounded;
+  }
+
+  Color get _operateurColor {
+    if (_course.modePaiement == 'MOOV_MONEY') {
+      return const Color(0xFF0066CC); // Bleu Moov
+    }
+    return const Color(0xFFFF6B00); // Orange T-Money
   }
 
   @override
@@ -76,29 +121,82 @@ class _PaiementScreenState extends State<PaiementScreen> {
       body: SafeArea(
         child: Column(
           children: [
-            // Header
+            // ─── Header ──────────────────────────────────────────────
             Container(
               padding: const EdgeInsets.all(20),
-              color: Colors.white,
-              child: Row(
+              decoration: BoxDecoration(
+                color: _operateurColor,
+                borderRadius: const BorderRadius.vertical(
+                  bottom: Radius.circular(28),
+                ),
+              ),
+              child: Column(
                 children: [
-                  Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: AppColors.success.withOpacity(0.12),
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(Icons.check_circle_rounded, color: AppColors.success, size: 28),
-                  ),
-                  const SizedBox(width: 14),
-                  const Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                  Row(
                     children: [
-                      Text(' Course terminée !',
-                          style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: AppColors.textDark)),
-                      Text('Merci d\'avoir utilisé Zém & Taxi',
-                          style: TextStyle(fontSize: 13, color: AppColors.textMedium)),
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.2),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(_operateurIcon,
+                            color: Colors.white, size: 32),
+                      ),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Paiement $_operateur',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 20,
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
+                            const Text(
+                              'Entrez votre code PIN',
+                              style: TextStyle(
+                                color: Colors.white70,
+                                fontSize: 14,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                     ],
+                  ),
+                  const SizedBox(height: 24),
+                  // Montant
+                  Container(
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.15),
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Column(
+                      children: [
+                        const Text(
+                          'MONTANT À PAYER',
+                          style: TextStyle(
+                            color: Colors.white70,
+                            fontSize: 11,
+                            letterSpacing: 1.5,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          '${prix.toInt()} FCFA',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 36,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ],
               ),
@@ -106,80 +204,125 @@ class _PaiementScreenState extends State<PaiementScreen> {
 
             Expanded(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.all(20),
+                padding: const EdgeInsets.all(24),
                 child: Column(
                   children: [
-                    // Montant
+                    const SizedBox(height: 12),
+
+                    //  Interface simulation USSD simplifiée
                     Container(
-                      padding: const EdgeInsets.all(24),
+                      padding: const EdgeInsets.all(20),
                       decoration: BoxDecoration(
                         color: Colors.white,
                         borderRadius: BorderRadius.circular(20),
-                        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10)],
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.05),
+                            blurRadius: 10,
+                          ),
+                        ],
                       ),
                       child: Column(
                         children: [
-                          const Text('MONTANT À PAYER',
-                              style: TextStyle(fontSize: 11, color: AppColors.textMedium, letterSpacing: 1.5)),
-                          const SizedBox(height: 10),
-                          Text('${prix.toInt()} FCFA',
-                              style: const TextStyle(fontSize: 40, fontWeight: FontWeight.w900, color: AppColors.primary)),
+                          const Icon(
+                            Icons.lock_outline,
+                            size: 48,
+                            color: AppColors.primary,
+                          ),
+                          const SizedBox(height: 16),
+                          const Text(
+                            'Code PIN de confirmation',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: AppColors.textDark,
+                            ),
+                          ),
                           const SizedBox(height: 8),
+                          const Text(
+                            'Simulation USSD',
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: AppColors.textMedium,
+                            ),
+                          ),
+                          const SizedBox(height: 28),
+
+                          //  4 champs pour le code PIN
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                            children: List.generate(4, (i) {
+                              return SizedBox(
+                                width: 64,
+                                height: 72,
+                                child: TextField(
+                                  controller: _pinCtrls[i],
+                                  focusNode: _pinNodes[i],
+                                  textAlign: TextAlign.center,
+                                  keyboardType: TextInputType.number,
+                                  maxLength: 1,
+                                  obscureText: true,
+                                  style: const TextStyle(
+                                    fontSize: 28,
+                                    fontWeight: FontWeight.bold,
+                                    color: AppColors.textDark,
+                                  ),
+                                  decoration: InputDecoration(
+                                    counterText: '',
+                                    filled: true,
+                                    fillColor: AppColors.background,
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(14),
+                                      borderSide: const BorderSide(
+                                          color: AppColors.border),
+                                    ),
+                                    focusedBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(14),
+                                      borderSide: BorderSide(
+                                        color: _operateurColor,
+                                        width: 2.5,
+                                      ),
+                                    ),
+                                  ),
+                                  onChanged: (v) => _onPinChanged(i, v),
+                                ),
+                              );
+                            }),
+                          ),
+
+                          const SizedBox(height: 24),
+
+                          // Info sécurité
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                            padding: const EdgeInsets.all(14),
                             decoration: BoxDecoration(
                               color: AppColors.background,
-                              borderRadius: BorderRadius.circular(20),
+                              borderRadius: BorderRadius.circular(12),
                             ),
-                            child: Text(
-                              _modePaiementLabel(),
-                              style: const TextStyle(fontSize: 13, color: AppColors.textMedium),
+                            child: Row(
+                              children: [
+                                Icon(Icons.info_outline,
+                                    color: _operateurColor, size: 20),
+                                const SizedBox(width: 10),
+                                const Expanded(
+                                  child: Text(
+                                    'Votre code PIN est sécurisé et ne sera jamais stocké.',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: AppColors.textMedium,
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                         ],
                       ),
                     ),
-                    const SizedBox(height: 20),
 
-                    // Notation conducteur
-                    if (_course.conducteur != null) ...[
-                      Container(
-                        padding: const EdgeInsets.all(20),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: Column(
-                          children: [
-                            const Text('Notez votre conducteur',
-                                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: AppColors.textDark)),
-                            const SizedBox(height: 6),
-                            Text(_course.conducteur!.nomComplet,
-                                style: const TextStyle(color: AppColors.textMedium, fontSize: 13)),
-                            const SizedBox(height: 16),
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: List.generate(5, (i) {
-                                return GestureDetector(
-                                  onTap: () => setState(() => _note = i + 1),
-                                  child: Padding(
-                                    padding: const EdgeInsets.symmetric(horizontal: 6),
-                                    child: Icon(
-                                      i < _note ? Icons.star_rounded : Icons.star_outline_rounded,
-                                      color: const Color(0xFFF39C12),
-                                      size: 36,
-                                    ),
-                                  ),
-                                );
-                              }),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 20),
-                    ],
+                    const SizedBox(height: 24),
 
-                    // Trajet résumé
+                    // Résumé trajet
                     Container(
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
@@ -187,10 +330,36 @@ class _PaiementScreenState extends State<PaiementScreen> {
                         borderRadius: BorderRadius.circular(16),
                       ),
                       child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          _Row(icon: Icons.place, color: AppColors.success, text: _course.departAdresse ?? 'Départ'),
+                          const Text(
+                            'Résumé de la course',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 15,
+                              color: AppColors.textDark,
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          _InfoRow(
+                            icon: Icons.place,
+                            color: AppColors.success,
+                            text: _course.departAdresse ?? 'Départ',
+                          ),
                           const SizedBox(height: 10),
-                          _Row(icon: Icons.flag, color: AppColors.primary, text: _course.destinationAdresse ?? 'Destination'),
+                          _InfoRow(
+                            icon: Icons.flag,
+                            color: AppColors.primary,
+                            text: _course.destinationAdresse ?? 'Destination',
+                          ),
+                          if (_course.conducteur != null) ...[
+                            const SizedBox(height: 10),
+                            _InfoRow(
+                              icon: Icons.person_rounded,
+                              color: AppColors.textMedium,
+                              text: _course.conducteur!.nomComplet,
+                            ),
+                          ],
                         ],
                       ),
                     ),
@@ -199,14 +368,15 @@ class _PaiementScreenState extends State<PaiementScreen> {
               ),
             ),
 
-            // Bouton payer
+            // ─── Bouton confirmation ─────────────────────────────────
             Padding(
               padding: const EdgeInsets.all(20),
               child: AppButton(
                 label: 'CONFIRMER LE PAIEMENT',
-                onPressed: _payer,
+                onPressed: _pin.length == 4 ? _payer : null,
                 loading: _loading,
-                icon: Icons.payments_rounded,
+                icon: Icons.check_circle_outline,
+                color: _operateurColor,
               ),
             ),
           ],
@@ -216,11 +386,15 @@ class _PaiementScreenState extends State<PaiementScreen> {
   }
 }
 
-class _Row extends StatelessWidget {
+class _InfoRow extends StatelessWidget {
   final IconData icon;
   final Color color;
   final String text;
-  const _Row({required this.icon, required this.color, required this.text});
+  const _InfoRow({
+    required this.icon,
+    required this.color,
+    required this.text,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -228,7 +402,12 @@ class _Row extends StatelessWidget {
       children: [
         Icon(icon, color: color, size: 18),
         const SizedBox(width: 10),
-        Expanded(child: Text(text, style: const TextStyle(fontSize: 13, color: AppColors.textDark))),
+        Expanded(
+          child: Text(
+            text,
+            style: const TextStyle(fontSize: 13, color: AppColors.textDark),
+          ),
+        ),
       ],
     );
   }

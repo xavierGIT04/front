@@ -7,6 +7,7 @@ import 'register/step1_phone_screen.dart';
 import 'passager_home_screen.dart';
 import 'conducteur_home_screen.dart';
 import 'validation_en_attente_screen.dart';
+import 'package:flutter/services.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -83,7 +84,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 const SizedBox(height: 16),
                 const Center(
                   child: Text(
-                    'Zém & Taxi',
+                    'ZemExpress',
                     style: TextStyle(
                       fontSize: 28,
                       fontWeight: FontWeight.w900,
@@ -122,6 +123,11 @@ class _LoginScreenState extends State<LoginScreen> {
                 TextFormField(
                   controller: _phoneCtrl,
                   keyboardType: TextInputType.phone,
+                  maxLength: 8, // Limite physique à 8 caractères
+                  inputFormatters: [
+                    FilteringTextInputFormatter.digitsOnly, // Autorise uniquement 0-9
+                    LengthLimitingTextInputFormatter(8),    // Sécurité supplémentaire pour bloquer à 8
+                  ],
                   decoration: const InputDecoration(
                     prefixIcon: Padding(
                       padding: EdgeInsets.all(12),

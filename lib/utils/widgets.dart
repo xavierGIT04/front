@@ -123,6 +123,7 @@ class AppLogo extends StatelessWidget {
   }
 }
 
+
 /// Indicateur d'étapes pour le processus d'inscription
 class StepIndicator extends StatelessWidget {
   final int currentStep;

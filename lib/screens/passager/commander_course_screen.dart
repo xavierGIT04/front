@@ -154,6 +154,7 @@ class _CommanderCourseScreenState extends State<CommanderCourseScreen> {
         dLng: _departLng,
         aLat: _destLat!,
         aLng: _destLng!,
+        typeVehicule: _typeVehicule
       );
       if (mounted) setState(() => _estimation = est);
     } catch (_) {}
@@ -406,20 +407,29 @@ class _CommanderCourseScreenState extends State<CommanderCourseScreen> {
                         label: 'Zém',
                         sublabel: 'Moto-taxi',
                         selected: _typeVehicule == 'ZEM',
-                        onTap: () =>
-                            setState(() => _typeVehicule = 'ZEM'),
+                        onTap: () {
+                          setState(() {
+                            _typeVehicule = 'ZEM';
+                            _estimation = null; // Optionnel : efface l'ancien prix pendant le chargement
+                          });
+                          _estimerCourse(); // <── APPEL ICI
+                        },
                       ),
                       const SizedBox(width: 12),
                       _VehiculeChip(
                         label: 'Taxi',
                         sublabel: 'Voiture',
                         selected: _typeVehicule == 'TAXI',
-                        onTap: () =>
-                            setState(() => _typeVehicule = 'TAXI'),
+                        onTap: () {
+                          setState(() {
+                            _typeVehicule = 'TAXI';
+                            _estimation = null; // Optionnel
+                          });
+                          _estimerCourse(); // <── APPEL ICI
+                        },
                       ),
                     ],
                   ),
-
                   // ── CORRECTION 1 : Mode paiement (3 options) ──────────
                   const SizedBox(height: 20),
                   const Text('Mode de paiement',

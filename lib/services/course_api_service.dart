@@ -18,9 +18,10 @@ class CourseApiService {
   static Future<Map<String, dynamic>> estimerCourse({
     required double dLat, required double dLng,
     required double aLat, required double aLng,
+    required String? typeVehicule
   }) async {
     final uri = Uri.parse(
-      '${ApiService.baseUrl}/courses/estimation?dLat=$dLat&dLng=$dLng&aLat=$aLat&aLng=$aLng',
+      '${ApiService.baseUrl}/courses/estimation?dLat=$dLat&dLng=$dLng&aLat=$aLat&aLng=$aLng&vehicule=$typeVehicule',
     );
     final response = await http.get(uri, headers: await _authHeaders());
     if (response.statusCode == 200) return jsonDecode(response.body);
@@ -35,7 +36,7 @@ class CourseApiService {
     required double destLng,
     required String destAdresse,
     required String modePaiement,
-    String typeVehicule = 'ZEM',
+    required String typeVehicule,
   }) async {
     final uri = Uri.parse('${ApiService.baseUrl}/courses/commander');
     final response = await http.post(

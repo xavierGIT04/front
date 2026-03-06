@@ -106,6 +106,7 @@ class _SuiviCourseConducteurScreenState
                 lat: _course.departLat,
                 lng: _course.departLng,
                 enLigne: true,
+
               ),
             ),
 

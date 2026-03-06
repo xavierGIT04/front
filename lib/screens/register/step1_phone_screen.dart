@@ -3,6 +3,7 @@ import '../../services/api_service.dart';
 import '../../utils/app_theme.dart';
 import '../../utils/widgets.dart';
 import 'step2_otp_screen.dart';
+import 'package:flutter/services.dart';
 
 
 class Step1PhoneScreen extends StatefulWidget {
@@ -143,13 +144,18 @@ class _Step1PhoneScreenState extends State<Step1PhoneScreen> {
                           child: TextField(
                             controller: _phoneCtrl,
                             keyboardType: TextInputType.phone,
+                            maxLength: 8, // Limite physique à 8 caractères
+                            inputFormatters: [
+                              FilteringTextInputFormatter.digitsOnly, // Autorise uniquement 0-9
+                              LengthLimitingTextInputFormatter(8),    // Sécurité supplémentaire pour bloquer à 8
+                            ],
                             decoration: const InputDecoration(
                               hintText: '90 00 00 00',
                               border: InputBorder.none,
                               enabledBorder: InputBorder.none,
                               focusedBorder: InputBorder.none,
                               contentPadding: EdgeInsets.symmetric(
-                                  horizontal: 16, vertical: 17),
+                                  horizontal: 16, vertical: 16),
                             ),
                             style: const TextStyle(
                               fontSize: 16,

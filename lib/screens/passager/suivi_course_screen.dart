@@ -7,6 +7,8 @@ import '../../utils/widgets.dart';
 import 'passager_home_screen.dart';
 import 'passager_map_view.dart';           // ← AJOUT
 import 'paiement_screen.dart';
+import 'notation_screen.dart';
+
 
 /// Écran de SUIVI côté PASSAGER
 /// Affiché quand la course est ACCEPTEE | EN_COURS | ARRIVEE
@@ -49,12 +51,35 @@ class _SuiviCoursePassagerScreenState
 
       setState(() => _course = updated);
 
+      //  MODIFICATION : Gestion selon mode paiement
       if (updated.arrivee && mounted) {
+        _pollingTimer?.cancel();
+
+        //  Si paiement mobile → interface de simulation USSD
+        if (_course.modePaiement == 'TMONEY' || _course.modePaiement == 'MOOV_MONEY') {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+                builder: (_) => PaiementScreen(course: updated)),
+          );
+        }
+        //  Si espèces → la course est déjà terminée, on vérifie
+        else if (_course.terminee) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+                builder: (_) => NotationScreen(course: updated)),
+          );
+        }
+      }
+
+      //  Si la course passe directement à TERMINEE (espèces)
+      if (updated.terminee && !updated.paiementConfirme && mounted) {
         _pollingTimer?.cancel();
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
-              builder: (_) => PaiementScreen(course: updated)),
+              builder: (_) => NotationScreen(course: updated)),
         );
       }
     } catch (_) {}
@@ -151,7 +176,7 @@ class _SuiviCoursePassagerScreenState
                         ),
                       ),
                       Text(
-                        '${(_course.prixFinal ?? _course.prixEstime ?? 0).toInt()} F',
+                        '${(_course.prixFinal)} F',
                         style: const TextStyle(
                             fontWeight: FontWeight.w900,
                             fontSize: 16,
@@ -215,15 +240,15 @@ class _StatutBadge extends StatelessWidget {
   Widget build(BuildContext context) {
     const config = {
       'ACCEPTEE': {
-        'label': '🏍️ Conducteur en route vers vous',
+        'label': ' Conducteur en route vers vous',
         'color': Color(0xFF2196F3)
       },
       'EN_COURS': {
-        'label': '🚀 Vous êtes en route !',
+        'label': ' Vous êtes en route !',
         'color': AppColors.success
       },
       'ARRIVEE': {
-        'label': '🎯 Arrivé à destination — Paiement...',
+        'label': ' Arrivé à destination — Paiement...',
         'color': AppColors.primary
       },
     };
